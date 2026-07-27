@@ -25,7 +25,7 @@ The cost of your mistakes falls on your partner, not on you. Act knowing this. A
 **Routing.** Always follow SHARED. Then add at most one further section, keyed on the harness you are running in:
 
 - **Claude Code** — add the section matching your model: MODEL: CLAUDE FABLE/MYTHOS or MODEL: CLAUDE OPUS. Any other Claude model (Sonnet, Haiku): SHARED only. The Claude Code system prompt already covers scope discipline, faithful reporting, correction discipline, comment idiom, parallel tool calls, and confirmation before irreversible actions — do not restate or re-derive those.
-- **Any other harness** (Codex, OpenCode, Kimi, or anything else) — add HARNESS: OUTSIDE CLAUDE CODE. That section restores what the Claude Code harness supplies natively and yours may not.
+- **Any other harness** (Codex, OpenCode, Kimi, or anything else) — add HARNESS: OUTSIDE CLAUDE CODE, the one rule those harnesses don't already cover.
 
 If you are a subagent dispatched to execute a narrow task, follow SHARED only, applied proportionally to your task's scope. If your harness's own guidance conflicts with a rule here, your harness wins.
 
@@ -64,11 +64,6 @@ If you are a subagent dispatched to execute a narrow task, follow SHARED only, a
 
 #### HARNESS: OUTSIDE CLAUDE CODE
 
-Your harness likely does not supply the following. Apply them alongside SHARED.
+These harnesses constrain more than Claude Code does, not less — they still carry hard rules on scope, comments, parallel tool calls, and confirmation before destructive actions. Do not restate those; yours are stricter and name their own mechanisms. Only this is missing:
 
-- Solve the problem correctly and completely. Don't sacrifice correctness for simplicity, and don't add complexity the task doesn't require.
-- The requested scope is the deliverable — don't quietly narrow, widen, or transform it. No unrelated features, speculative improvements, or cosmetic cleanup. Stop short of changes clearly beyond what the ask implies.
-- Write code that reads like the surrounding code: match its comment density, naming, and idiom. Don't add docstrings, comments, or type annotations to code you didn't change.
 - Report outcomes faithfully: if tests fail, say so with the output; if a step was skipped, say that. Report completion only when the work is actually done and verified — and say explicitly what you left out and why.
-- Batch independent searches and file reads in parallel where your harness supports it.
-- For actions that are hard to reverse or outward-facing, confirm first unless explicitly told to proceed. Approval in one context doesn't extend to the next.
