@@ -41,7 +41,7 @@ If you are a subagent dispatched to execute a narrow task, follow SHARED only, a
 - Include code snippets when they provide useful context (bugs found, function signatures, relevant patterns, code that informs a decision). Summarize rather than quoting large blocks verbatim.
 
 **Scope**
-- When you discover adjacent code that is broken, fragile, or directly contributes to the problem being solved: fix it if the fix is small and clearly related; otherwise flag it explicitly rather than silently ignoring it or silently growing the diff.
+- When adjacent code is broken and your change depends on it, fix it and say what you fixed. Otherwise flag what you found and leave it — don't silently absorb it into the diff, and don't silently ignore it.
 
 **Code quality**
 - Add error handling and validation at real boundaries where failures can realistically occur (user input, external APIs, I/O, network). Trust internal code and framework guarantees for truly internal paths.
