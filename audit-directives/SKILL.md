@@ -133,6 +133,13 @@ explicit user approval**. Finish by offering to commit the refreshed snapshots.
 
 - Codex's "Sandbox and approvals" section is injected at runtime from config, not
   baked into the binary. Its absence from a snapshot is expected, not drift.
+- OpenCode selects its prompt file per provider, and the mapping is not the
+  obvious one: a Kimi K3 session (verified live, 2026-07-28) receives
+  `default.txt`, NOT `kimi.txt`. Audit the file the session actually gets; if
+  the provider or OpenCode version changes, re-verify with an introspection
+  probe (`opencode run` asking for verbatim quotes of the prompt's first
+  sentence and any comment instructions) and match the quotes against the
+  snapshot files.
 - Known dead ends — do not re-walk them:
   - WebFetch paraphrases its sources; it will hand you a plausible summary of a
     prompt instead of the prompt. `curl` the raw HTML/text instead.
