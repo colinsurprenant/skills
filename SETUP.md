@@ -13,14 +13,12 @@ path):
     ln -s "$REPO/CLAUDE.global.md"       ~/.claude/CLAUDE.md
     ln -s "$REPO/audit-directives"       ~/.claude/skills/audit-directives
     ln -s "$REPO/opus-build"             ~/.claude/skills/opus-build
-    ln -s "$REPO/commands/iterate.md"    ~/.claude/commands/iterate.md
-    ln -s "$REPO/commands/w.md"          ~/.claude/commands/w.md
     ln -s "$REPO/agents/opus-builder.md" ~/.claude/agents/opus-builder.md
 
 `CLAUDE.global.md` `@`-imports `AGENT_BEHAVIOR.md`, which delivers the
 behavior file to every session and non-fork subagent, from any entry point.
-Skill, command, and agent bodies resolve through the symlinks at invocation
-time — edits land live, no session restart needed (only the name/description
+Skill and agent bodies resolve through the symlinks at invocation time —
+edits land live, no session restart needed (only the name/description
 listings are snapshotted at session start).
 
 Status line, in `~/.claude/settings.json` (the one place that needs a literal

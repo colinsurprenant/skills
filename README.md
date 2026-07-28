@@ -3,7 +3,7 @@
 My personal coding-agent configuration — Claude Code first, plus Codex CLI
 and OpenCode. There is no installer, but the wiring is deliberately simple —
 a dozen symlinks, documented in [SETUP.md](SETUP.md), with no hardcoded
-paths. The persona and command menu are mine: fork and edit.
+paths. The persona is mine: fork and edit.
 
 ## What's here
 
@@ -32,9 +32,6 @@ paths. The persona and command menu are mine: fork and edit.
   is the adversarial review from its first validation run.
 - **[agents/opus-builder.md](agents/opus-builder.md)** — the pinned-model
   build agent opus-build dispatches to.
-- **[commands/](commands/)** — `/iterate` (discovery-driven development loop)
-  and `/w` (curated skill menu; its contents are specific to my installed
-  stack).
 - **[statusline.js](statusline.js)** — status line script.
 - **[CLAUDE.global.md](CLAUDE.global.md)** — the `~/.claude/CLAUDE.md`
   target: the `@`-import plus a placeholder for durable preferences.
