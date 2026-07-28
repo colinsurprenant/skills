@@ -15,6 +15,10 @@ If this session is not running on Fable, say so and skip this workflow — its
 premise (the 2x drain and the 50% cap) doesn't apply, and the phases are pure
 overhead on any other model.
 
+On activation, announce it to the user in plain text (e.g. "opus-build is
+active") and briefly narrate the phase transitions — dispatching to Opus
+builders, returning to Fable for review — so activation is never silent.
+
 Two standing rules while this skill is active:
 
 - Keep the Fable main loop lean. Don't bulk-read files here — delegate exploration
