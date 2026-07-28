@@ -145,6 +145,10 @@ codex/opencode snapshots (the gitignored claude-code/ snapshot stays local).
   probe (`opencode run` asking for verbatim quotes of the prompt's first
   sentence and any comment instructions) and match the quotes against the
   snapshot files.
+- [CL4R1T4S](https://github.com/elder-plinius/CL4R1T4S) can corroborate
+  model-level prompt language (claude.ai surfaces), but carries no current
+  Claude Code harness prompt and is AGPL-3.0 — cross-check against it if
+  useful, never vendor from it.
 - Known dead ends — do not re-walk them:
   - WebFetch paraphrases its sources; it will hand you a plausible summary of a
     prompt instead of the prompt. `curl` the raw HTML/text instead.

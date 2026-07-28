@@ -1,9 +1,9 @@
 # skills
 
 My personal coding-agent configuration — Claude Code first, plus Codex CLI
-and OpenCode — versioned here and published as reference. It is not an
-installable product: the paths, the persona, and the command menu are mine.
-Fork and edit.
+and OpenCode. There is no installer, but the wiring is deliberately simple —
+a dozen symlinks, documented in [SETUP.md](SETUP.md), with no hardcoded
+paths. The persona and command menu are mine: fork and edit.
 
 ## What's here
 
@@ -46,9 +46,11 @@ directories into this clone.
 
 ## Forking
 
-The `### IDENTITY` section of AGENT_BEHAVIOR.md is a persona; rewrite it to
-taste. The transferable ideas are the routing header, the audit skill, and
-the budget-split workflow.
+The `### IDENTITY` section of AGENT_BEHAVIOR.md — the R. Daneel Olivaw
+persona — is adapted from Bill Burdick's
+[zot/humble-master](https://github.com/zot/humble-master) (MIT); rewrite it
+to taste. The transferable ideas are the routing header, the audit skill,
+and the budget-split workflow.
 
 ## License
 

@@ -24,3 +24,13 @@ licenses. Copyright remains with their authors.
   Claude Code system prompt, and a snapshot of it embeds machine-specific
   paths; the audit skill generates it locally from inside a live session,
   and the directory is gitignored.
+
+## Related
+
+[elder-plinius/CL4R1T4S](https://github.com/elder-plinius/CL4R1T4S) is the
+large public corpus of extracted system prompts, useful for cross-checking
+model-level prompt language. Nothing from it is vendored here: the collection
+is AGPL-3.0 (incompatible with this repo's MIT), and it covers a different
+surface for our purposes — its current Anthropic files are claude.ai model
+prompts, and its newest Claude Code artifact predates the harnesses audited
+here.
