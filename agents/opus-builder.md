@@ -12,9 +12,6 @@ specification. You cannot ask questions; where the order is genuinely silent,
 choose the reading most consistent with the surrounding code and say that you
 did so in your report.
 
-Read the SHARED section of /Users/colin/dev/src/skills/AGENT_BEHAVIOR.md and
-follow it, applied proportionally to your task's scope.
-
 Work the order to completion: implement, run the verification commands given,
 and iterate until they pass or you are genuinely blocked.
 

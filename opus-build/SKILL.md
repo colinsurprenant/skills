@@ -39,10 +39,11 @@ Two standing rules while this skill is active:
    - **Acceptance criteria** — observable, checkable statements.
    - **Verification** — exact test/build commands to run.
 
-The work order stays pure task content: the `opus-builder` agent definition
-(committed alongside this skill) carries the standing directives — read and
-follow the SHARED section of AGENT_BEHAVIOR.md, report the deliverable
-faithfully — so they don't need repeating in every order.
+The work order stays pure task content: AGENT_BEHAVIOR.md reaches builders
+automatically via the @-import in CLAUDE.global.md (its routing header scopes
+subagents to SHARED), and the `opus-builder` agent definition (committed
+alongside this skill) carries the reporting contract — so neither needs
+repeating in every order.
 
 ## Phase 2 — Build (Opus, xhigh)
 
