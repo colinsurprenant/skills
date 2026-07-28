@@ -100,7 +100,9 @@ scaled to the stakes of the change. The first two cost no Anthropic tokens:
   the rescue agent is fix-capable and will edit if not told otherwise.
 - **OpenCode**: `opencode run "<review prompt naming the diff/branch>"` via
   Bash with `run_in_background` (or a long explicit timeout) — a real review
-  run exceeds the default Bash timeout.
+  run exceeds the default Bash timeout. OpenCode is currently the Kimi K3
+  vehicle, so this pass doubles as the Kimi review; a dedicated Kimi harness
+  may be added later.
 - **`/code-review:code-review`** is the EXPENSIVE escalation — its agents bill
   Anthropic-side. Reserve it for high-stakes diffs the user explicitly wants
   deep-reviewed.
