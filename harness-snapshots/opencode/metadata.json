@@ -1,0 +1,78 @@
+{
+  "commit": "127bdb30784d508cc556c71a0f32b508a3061517",
+  "files": [
+    {
+      "bytes": 8212,
+      "file": "anthropic.txt",
+      "sha256": "8324e4cf58eb45d4d9d6fd120f5e8da59e0548de48e7e6aefcdfbf2923f40b4e"
+    },
+    {
+      "bytes": 11080,
+      "file": "beast.txt",
+      "sha256": "a384d7b485829c1fe43bd6deaae10466db2c16b8cba045764538974f737958ba"
+    },
+    {
+      "bytes": 233,
+      "file": "build-switch.txt",
+      "sha256": "5e3db616a685a3dfaaf95fb86ae6e2acfbdf520bda60f7b27f727d2a88ba8a25"
+    },
+    {
+      "bytes": 7390,
+      "file": "codex.txt",
+      "sha256": "c30bca40693a47965e25ceac3f02d3709712af7abeab1278bba53a9efcffa928"
+    },
+    {
+      "bytes": 14241,
+      "file": "copilot-gpt-5.txt",
+      "sha256": "0ef5261daf7a4ae72b3e874cabc7b06cf34d991376d1dcfa1874734b13031828"
+    },
+    {
+      "bytes": 8528,
+      "file": "default.txt",
+      "sha256": "962fbf3cb3ec659c9a5244425ee2e7bb141ad4428f489a630a7738566880dc6a"
+    },
+    {
+      "bytes": 15372,
+      "file": "gemini.txt",
+      "sha256": "921750803b0314b88b8adc996e2afcf1a61fd7d9dd6dfcf812baeadac1468cf3"
+    },
+    {
+      "bytes": 9284,
+      "file": "gpt.txt",
+      "sha256": "83a66a46a5febbc21454161d5f053638b22d25d95e09d77b8f6da33debc848ad"
+    },
+    {
+      "bytes": 8695,
+      "file": "kimi.txt",
+      "sha256": "ade9199b00df5aa3b51bb02b8e8c711f3e0de224345aef7df9f31d3ea08a5bc7"
+    },
+    {
+      "bytes": 8347,
+      "file": "meta.txt",
+      "sha256": "9c5323f076a032f305386bfab3220a764f90489e9fa2a4c4796bffe031ce03e8"
+    },
+    {
+      "bytes": 4547,
+      "file": "plan-mode.txt",
+      "sha256": "473381e8f20d054fa24ed3631a3b741a4fd432dadb8a0f0925f73d94a6e2866c"
+    },
+    {
+      "bytes": 4056,
+      "file": "plan-reminder-anthropic.txt",
+      "sha256": "8c4517ba847f753b2e25f7056ddc393f6728074fa6444d4070d121e75b1f91b5"
+    },
+    {
+      "bytes": 1484,
+      "file": "plan.txt",
+      "sha256": "455db97e0d21e8097c2afb539d167b4b2483e99b585dbc4fff23cafd4a3029b8"
+    },
+    {
+      "bytes": 7748,
+      "file": "trinity.txt",
+      "sha256": "0019dc1d018d08c1b5a065d10896e22d2615d33580088f44aefc3a042a46ebe2"
+    }
+  ],
+  "ref": "v1.18.3",
+  "repo": "anomalyco/opencode",
+  "version": "1.18.3"
+}

@@ -1,0 +1,501 @@
+#!/usr/bin/env python3
+"""Snapshot the system prompts of the external harnesses (Codex CLI, OpenCode).
+
+Writes harness-snapshots/<harness>/ so that `git diff harness-snapshots/` is the
+drift detector: the output is a pure function of the installed binary, the model
+configured for it on this machine, and the upstream repo, with no timestamps, so
+a refetch with no upstream change leaves the tree byte-identical.
+
+harness-snapshots/claude-code/ is not managed here -- the audit skill owns it,
+because Claude Code's prompt can only be read from inside a live session.
+"""
+
+import argparse
+import hashlib
+import json
+import subprocess
+import sys
+import tomllib
+import urllib.error
+import urllib.request
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+SNAPSHOT_ROOT = REPO_ROOT / "harness-snapshots"
+
+CODEX_RELEASES = Path.home() / ".codex" / "packages" / "standalone" / "releases"
+CODEX_CONFIG = Path.home() / ".codex" / "config.toml"
+CODEX_MARKER = b"You are a coding agent"
+CODEX_MANIFEST_ANCHOR = b'{\n  "models"'
+# Only a fallback: these sections identify the gpt-5.2 prompt, which is the
+# active one solely when that is the configured model. The configured model
+# names its own prompt in the manifest, so prefer that.
+CODEX_ACTIVE_SECTIONS = (
+    "## Ambition vs. precision",
+    "## Presenting your work",
+    "# Tool Guidelines",
+)
+MIN_PROMPT_BYTES = 2000
+
+OPENCODE_SEED_REPO = "sst/opencode"
+OPENCODE_PROMPT_DIR = "packages/opencode/src/session/prompt"
+GITHUB_API = "https://api.github.com"
+USER_AGENT = "fetch-harness-prompts"
+
+
+def die(message):
+    print(f"error: {message}", file=sys.stderr)
+    raise SystemExit(1)
+
+
+def sha256(payload):
+    return hashlib.sha256(payload).hexdigest()
+
+
+def to_json(obj):
+    return json.dumps(obj, indent=2, sort_keys=True) + "\n"
+
+
+def find_all(data, needle):
+    offsets = []
+    at = data.find(needle)
+    while at != -1:
+        offsets.append(at)
+        at = data.find(needle, at + 1)
+    return offsets
+
+
+# --- codex ------------------------------------------------------------------
+
+
+def codex_release():
+    """Highest installed release: (version, arch, path to the codex binary).
+
+    Sorted rather than picked by first-best scan: one version can be installed
+    for two architectures, and resolving that by iterdir order would flip `arch`
+    and `binary_sha256` between runs on an unchanged machine.
+    """
+    if not CODEX_RELEASES.is_dir():
+        die(f"no Codex releases directory at {CODEX_RELEASES}")
+    usable = []
+    incomplete = []
+    for entry in CODEX_RELEASES.iterdir():
+        if not entry.is_dir():
+            continue
+        version, _, arch = entry.name.partition("-")
+        try:
+            # compare numerically: 0.144.6 beats 0.99.0, lexical sort does not
+            key = tuple(int(part) for part in version.split("."))
+        except ValueError:
+            continue
+        binary = entry / "bin" / "codex"
+        if binary.is_file():
+            usable.append((key, arch, version, binary))
+        else:
+            incomplete.append((key, entry.name))
+    if not usable:
+        die(f"no usable Codex release under {CODEX_RELEASES}")
+    usable.sort(key=lambda item: (item[0], item[1]))
+    key, arch, version, binary = usable[-1]
+
+    # a half-installed newer release means the snapshot is of a version Codex may
+    # be about to stop running, which is worth saying out loud rather than
+    # silently skipping
+    newer = sorted(name for other, name in incomplete if other > key)
+    if newer:
+        print(
+            f"warning: ignoring newer Codex release(s) {', '.join(newer)} with no "
+            f"bin/codex (partial install?); snapshotting {version}-{arch} instead",
+            file=sys.stderr,
+        )
+    return version, arch, binary
+
+
+def text_region_end(data, start):
+    """End offset of the UTF-8 text region starting at `start`.
+
+    Prompts are stored as bare constants with no terminator, so a region ends at
+    the first byte that is neither printable ASCII nor part of a valid UTF-8
+    sequence. Accepting only \\x20-\\x7e is not enough: the prompts contain curly
+    quotes, em dashes and arrows, which would split one prompt into fragments.
+    """
+    at = start
+    size = len(data)
+    while at < size:
+        byte = data[at]
+        if byte in (9, 10) or 0x20 <= byte <= 0x7E:
+            at += 1
+            continue
+        for width in (2, 3, 4):
+            chunk = data[at : at + width]
+            if len(chunk) < width:
+                continue
+            try:
+                decoded = chunk.decode("utf-8")
+            except UnicodeDecodeError:
+                continue
+            if len(decoded) == 1 and ord(decoded) >= 0x80:
+                at += width
+                break
+        else:
+            return at
+    return size
+
+
+def codex_manifest(data):
+    """(start, end, doc) of the models manifest embedded in the binary."""
+    for at in find_all(data, CODEX_MANIFEST_ANCHOR):
+        end = text_region_end(data, at)
+        try:
+            doc, _ = json.JSONDecoder().raw_decode(data[at:end].decode("utf-8"))
+        except (UnicodeDecodeError, ValueError):
+            continue
+        if isinstance(doc, dict) and isinstance(doc.get("models"), list):
+            return at, end, doc
+    return None
+
+
+def json_strings(node):
+    if isinstance(node, dict):
+        for value in node.values():
+            yield from json_strings(value)
+    elif isinstance(node, list):
+        for value in node:
+            yield from json_strings(value)
+    elif isinstance(node, str):
+        yield node
+
+
+def codex_configured_model():
+    """The model id Codex is configured to run, or None if it cannot be read.
+
+    A user-owned config file is an external input: absent, unreadable, malformed
+    or silent about the model all mean the same thing here -- we do not know
+    which prompt is live -- and none of them may abort the snapshot. ValueError
+    covers both halves of a bad file: TOMLDecodeError and a decode failure.
+    """
+    try:
+        with open(CODEX_CONFIG, "rb") as handle:
+            config = tomllib.load(handle)
+    except (OSError, ValueError):
+        return None
+    model = config.get("model")
+    return model if isinstance(model, str) and model else None
+
+
+def is_prompt(text):
+    return text.startswith("You are ") and len(text.encode("utf-8")) >= MIN_PROMPT_BYTES
+
+
+def codex_manifest_prompts(doc):
+    """Instructions carried in the manifest, as {prompt text: {model ids}}.
+
+    The manifest keys instructions per model, which is what makes the active
+    prompt identifiable; a prompt reachable only from outside a model entry is
+    still extracted, just unattributed.
+    """
+    prompts = {}
+    for model in doc["models"]:
+        if not isinstance(model, dict) or not isinstance(model.get("slug"), str):
+            continue
+        for text in json_strings(model):
+            if is_prompt(text):
+                prompts.setdefault(text, set()).add(model["slug"])
+    for text in json_strings(doc):
+        if is_prompt(text):
+            prompts.setdefault(text, set())
+    return prompts
+
+
+def codex_plain_prompts(data, skip_range):
+    """Prompts stored as bare text constants, outside the manifest.
+
+    A prompt repeats the marker in its own body, and every occurrence inside one
+    region shares that region's end, so key by end offset and keep the earliest
+    start -- otherwise a mid-prompt occurrence yields a truncated duplicate.
+    """
+    skip_start, skip_end = skip_range
+    starts = {}
+    for at in find_all(data, CODEX_MARKER):
+        if skip_start <= at < skip_end:
+            continue
+        end = text_region_end(data, at)
+        if end not in starts or at < starts[end]:
+            starts[end] = at
+    return [data[start:end].decode("utf-8") for end, start in starts.items()]
+
+
+def dedupe_prompts(prompts, anchored):
+    """Fold each anchored candidate that merely extends another one into it.
+
+    A bare constant runs into whatever bytes are packed after it. Where the same
+    prompt also appears with a clean end, the longer copy is that text plus
+    trailing junk, so drop any anchored candidate that extends another one -- and
+    fold its model ids into the copy that survives, being the same prompt.
+
+    That argument is about the anchoring, not the text: a manifest prompt is a
+    decoded JSON string that ends exactly where the prompt ends, so it can never
+    be another prompt plus junk. Two manifest prompts where one extends the other
+    are two real prompts and both stay, whatever their lengths.
+    """
+    kept = {
+        text: set(models)
+        for text, models in prompts.items()
+        if text not in anchored
+        or not any(other != text and text.startswith(other) for other in prompts)
+    }
+    for text, models in prompts.items():
+        if text in kept:
+            continue
+        for other in kept:
+            if text.startswith(other):
+                kept[other] |= models
+    return kept
+
+
+def build_codex():
+    version, arch, binary = codex_release()
+    data = binary.read_bytes()
+    configured_model = codex_configured_model()
+
+    manifest = codex_manifest(data)
+    if manifest is None:
+        die(f"no models manifest found in {binary}; extraction recipe is stale")
+    manifest_start, manifest_end, doc = manifest
+
+    prompts = codex_manifest_prompts(doc)
+    # a text the manifest also carries is a clean JSON string, so it counts as a
+    # manifest prompt however else it turns up in the binary
+    anchored = set()
+    for text in codex_plain_prompts(data, (manifest_start, manifest_end)):
+        if text in prompts:
+            continue
+        prompts[text] = set()
+        anchored.add(text)
+    prompts = dedupe_prompts(prompts, anchored)
+    if not prompts:
+        die(f"no prompts extracted from {binary}; extraction recipe is stale")
+
+    bodies = sorted(
+        ((text.encode("utf-8"), sorted(models)) for text, models in prompts.items()),
+        key=lambda item: (-len(item[0]), sha256(item[0])),
+    )
+
+    files = {}
+    entries = []
+    marked = []
+    for index, (body, models) in enumerate(bodies, start=1):
+        name = f"prompt-{index}.txt"
+        files[name] = body
+        text = body.decode("utf-8")
+        marked.append(all(section in text for section in CODEX_ACTIVE_SECTIONS))
+        entries.append(
+            {
+                "file": name,
+                "sha256": sha256(body),
+                "bytes": len(body),
+                "models": models,
+                "active": configured_model is not None and configured_model in models,
+            }
+        )
+
+    if configured_model is None:
+        fallback = f"no model configured in {CODEX_CONFIG}"
+    elif not any(entry["active"] for entry in entries):
+        fallback = f"no extracted prompt is claimed by model {configured_model!r}"
+    else:
+        fallback = None
+    active_source = "config" if fallback is None else "heuristic"
+    if fallback is not None:
+        for entry, is_marked in zip(entries, marked):
+            entry["active"] = is_marked
+        print(
+            f"warning: {fallback}; 'active' falls back to the marker-section "
+            "heuristic and may name a prompt Codex does not send",
+            file=sys.stderr,
+        )
+
+    # markers no longer identify the active prompt, so their loss is not fatal --
+    # it only leaves the fallback above with nothing to go on
+    if not any(marked):
+        print(
+            f"warning: no extracted Codex prompt contains {CODEX_ACTIVE_SECTIONS}; "
+            "the marker fallback is now dead and should be re-derived",
+            file=sys.stderr,
+        )
+
+    metadata = {
+        "version": version,
+        "arch": arch,
+        "binary_sha256": sha256(data),
+        "configured_model": configured_model,
+        # tells a reader of the snapshot whether 'active' is attribution or guess
+        "active_source": active_source,
+        "prompts": entries,
+    }
+    active = [entry["file"] for entry in entries if entry["active"]]
+    summary = (
+        f"codex {version} ({arch}) as {configured_model or 'unknown model'}: "
+        f"{len(files)} prompts, active: {', '.join(active) or 'none'}"
+    )
+    return "codex", files, metadata, summary
+
+
+# --- opencode ---------------------------------------------------------------
+
+
+def github_bytes(url):
+    request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+    try:
+        with urllib.request.urlopen(request, timeout=60) as response:
+            if response.status != 200:
+                die(f"{url}: HTTP {response.status}")
+            return response.read()
+    except urllib.error.HTTPError as exc:
+        die(f"{url}: HTTP {exc.code} {exc.reason}")
+    except urllib.error.URLError as exc:
+        die(f"{url}: {exc.reason}")
+
+
+def github_json(url):
+    try:
+        return json.loads(github_bytes(url))
+    except ValueError as exc:
+        die(f"{url}: response was not JSON ({exc})")
+
+
+def github_exists(url):
+    request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+    try:
+        with urllib.request.urlopen(request, timeout=60) as response:
+            return response.status == 200
+    except urllib.error.HTTPError as exc:
+        if exc.code == 404:
+            return False
+        die(f"{url}: HTTP {exc.code} {exc.reason}")
+    except urllib.error.URLError as exc:
+        die(f"{url}: {exc.reason}")
+
+
+def opencode_version():
+    try:
+        result = subprocess.run(
+            ["opencode", "--version"], capture_output=True, text=True, timeout=60
+        )
+    except OSError as exc:
+        die(f"could not run `opencode --version`: {exc}")
+    except subprocess.SubprocessError as exc:
+        die(f"`opencode --version` failed: {exc}")
+    if result.returncode != 0:
+        die(f"`opencode --version` exited {result.returncode}: {result.stderr.strip()}")
+    version = result.stdout.strip()
+    if not version:
+        die("`opencode --version` printed nothing")
+    return version
+
+
+def build_opencode():
+    version = opencode_version()
+
+    # The project changed owners; urllib follows the 301 on GET, so the current
+    # name and default branch come back in the response instead of hardcoded.
+    repo = github_json(f"{GITHUB_API}/repos/{OPENCODE_SEED_REPO}")
+    full_name = repo.get("full_name")
+    default_branch = repo.get("default_branch")
+    if not full_name or not default_branch:
+        die(f"unexpected repo metadata for {OPENCODE_SEED_REPO}")
+
+    ref = f"v{version}"
+    if not github_exists(f"{GITHUB_API}/repos/{full_name}/git/ref/tags/{ref}"):
+        # the default branch is not 'main' here, so never assume it
+        ref = default_branch
+
+    # resolve the ref to a commit first and read everything at that commit: a
+    # branch ref (and even a retagged tag) can move mid-fetch, which would mix
+    # files from two upstream states into one snapshot
+    commit = github_json(f"{GITHUB_API}/repos/{full_name}/commits/{ref}").get("sha")
+    if not commit:
+        die(f"could not resolve {full_name}@{ref} to a commit")
+
+    listing = github_json(
+        f"{GITHUB_API}/repos/{full_name}/contents/{OPENCODE_PROMPT_DIR}?ref={commit}"
+    )
+    if not isinstance(listing, list):
+        die(f"{OPENCODE_PROMPT_DIR} is not a directory in {full_name}@{commit}")
+
+    files = {}
+    for item in listing:
+        if item.get("type") != "file" or not item["name"].endswith(".txt"):
+            continue
+        url = item.get("download_url") or ""
+        # a listing read at a commit hands back commit-pinned raw URLs; refuse
+        # anything else rather than quietly downloading from a moving ref
+        if commit not in url:
+            die(f"{item['name']}: download URL {url!r} is not pinned to {commit}")
+        body = github_bytes(url)
+        # a wrong ref yields a 14-byte '404: Not Found' body with a 200 status --
+        # match it whole, so a real prompt that opens with '404' is not discarded
+        if body.strip() == b"404: Not Found":
+            die(f"{item['name']}: 404 body from {full_name}@{commit}")
+        files[item["name"]] = body
+
+    if not files:
+        die(f"no prompt files found in {full_name}@{commit}:{OPENCODE_PROMPT_DIR}")
+
+    metadata = {
+        "version": version,
+        "repo": full_name,
+        "ref": ref,
+        "commit": commit,
+        "files": [
+            {"file": name, "sha256": sha256(body), "bytes": len(body)}
+            for name, body in sorted(files.items())
+        ],
+    }
+    summary = (
+        f"opencode {version} ({full_name}@{ref} {commit[:7]}): {len(files)} prompts"
+    )
+    return "opencode", files, metadata, summary
+
+
+# --- writing ----------------------------------------------------------------
+
+
+def write_snapshot(harness, files, metadata):
+    directory = SNAPSHOT_ROOT / harness
+    directory.mkdir(parents=True, exist_ok=True)
+    # clear managed files first so a drop in prompt count cannot strand a stale one
+    for stale in directory.glob("*.txt"):
+        stale.unlink()
+    for name, body in sorted(files.items()):
+        (directory / name).write_bytes(body)
+    (directory / "metadata.json").write_text(to_json(metadata), encoding="utf-8")
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Snapshot external harness system prompts into harness-snapshots/."
+    )
+    parser.add_argument(
+        "--only",
+        choices=("codex", "opencode"),
+        help="snapshot a single harness instead of all of them",
+    )
+    args = parser.parse_args()
+
+    builders = {"codex": build_codex, "opencode": build_opencode}
+    wanted = [args.only] if args.only else list(builders)
+
+    # build everything before writing anything, so a failure leaves the tree alone
+    results = [builders[name]() for name in wanted]
+
+    for harness, files, metadata, _ in results:
+        write_snapshot(harness, files, metadata)
+
+    for _, _, _, summary in results:
+        print(summary)
+    print("review drift with: git diff --stat harness-snapshots/")
+
+
+if __name__ == "__main__":
+    main()

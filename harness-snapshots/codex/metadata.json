@@ -1,0 +1,92 @@
+{
+  "active_source": "config",
+  "arch": "aarch64-apple-darwin",
+  "binary_sha256": "80a3933d11a9d13ef806aa24f7bb8afc9169cfe4e9b09d6da6a92922cbde9cff",
+  "configured_model": "gpt-5.6-sol",
+  "prompts": [
+    {
+      "active": false,
+      "bytes": 21672,
+      "file": "prompt-1.txt",
+      "models": [
+        "gpt-5.2"
+      ],
+      "sha256": "c9b2fa097ac69cae82c3d2ae12271083890a96521c55ad8dc14cae5168ad3f39"
+    },
+    {
+      "active": false,
+      "bytes": 20903,
+      "file": "prompt-2.txt",
+      "models": [],
+      "sha256": "ac8ae107a0d72fe3476b430afb161ea4e67da2e446d778aefc44828160559807"
+    },
+    {
+      "active": false,
+      "bytes": 19766,
+      "file": "prompt-3.txt",
+      "models": [
+        "gpt-5.5"
+      ],
+      "sha256": "c13cc50bc068912608769224bf2c5ffcb5f534856fd631f3df0ef72a8a3108a4"
+    },
+    {
+      "active": false,
+      "bytes": 19749,
+      "file": "prompt-4.txt",
+      "models": [
+        "gpt-5.5"
+      ],
+      "sha256": "e58c21f9377e946e2e10f886fcbf6f030e1c6fd9067241c637a56e9e998d3c31"
+    },
+    {
+      "active": true,
+      "bytes": 17766,
+      "file": "prompt-5.txt",
+      "models": [
+        "gpt-5.6-luna",
+        "gpt-5.6-sol",
+        "gpt-5.6-terra"
+      ],
+      "sha256": "cbefa6b0bede0e332d957fca70ccacf9f12f4c0ecdf81b819e5cbe1a3b16e265"
+    },
+    {
+      "active": false,
+      "bytes": 12928,
+      "file": "prompt-6.txt",
+      "models": [
+        "codex-auto-review",
+        "gpt-5.4"
+      ],
+      "sha256": "b247d52d7da990f1e4b049a413654762d050b6dc359a7a6bb651d0f49e1971e3"
+    },
+    {
+      "active": false,
+      "bytes": 12911,
+      "file": "prompt-7.txt",
+      "models": [
+        "codex-auto-review",
+        "gpt-5.4"
+      ],
+      "sha256": "9721f7a86edc261996e628fe14fade8d66ec60e6cc727274a8da6a03e15464de"
+    },
+    {
+      "active": false,
+      "bytes": 11148,
+      "file": "prompt-8.txt",
+      "models": [
+        "gpt-5.4-mini"
+      ],
+      "sha256": "0394376e4d03e5f5ce6ea7f7ee22de6a5f23fde3a5a9cf21ea35114e18abf0a4"
+    },
+    {
+      "active": false,
+      "bytes": 11131,
+      "file": "prompt-9.txt",
+      "models": [
+        "gpt-5.4-mini"
+      ],
+      "sha256": "9109777dc7f3bc9ee9a0d187982b13538c53e0572de2959300f7226e9c59855e"
+    }
+  ],
+  "version": "0.144.6"
+}
