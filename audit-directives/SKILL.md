@@ -66,10 +66,17 @@ and audit it in full.
 Otherwise, snapshot first, then diff — so Claude Code drift becomes a git diff
 like any other harness:
 
-- `harness-snapshots/claude-code/system-prompt.txt` — the live system prompt,
-  verbatim, no commentary.
-- `harness-snapshots/claude-code/metadata.json` — `{"model": "<exact model id
-  from the environment>"}`. No timestamps.
+- `harness-snapshots/claude-code/system-prompt.txt` — the live system prompt's
+  harness prose, verbatim. EXCLUDE: tool/function schemas and the tool-system
+  preamble, system-reminder rosters (skills, agent types, MCP instructions),
+  the gitStatus session block, and the appended AGENT_BEHAVIOR.md sections
+  (`### IDENTITY` / `### CRITICAL BEHAVIOR`) — including those would make the
+  audit compare the file against itself. If a sentence contains harness tool
+  markup you cannot emit literally, normalize it (e.g. backtick the tag name)
+  and record that.
+- `harness-snapshots/claude-code/metadata.json` — `{"excludes": [...],
+  "model": "<exact model id from the environment>", "normalizations": [...]}`.
+  No timestamps.
 
 Now `git diff harness-snapshots/claude-code/` scopes this audit the same way
 Step 2 scopes the others — but only if the committed snapshot came from the
@@ -99,6 +106,10 @@ Give every such directive one of three verdicts against the harness prompt text:
 
 Judge against what the harness prompt actually says, not what you remember it
 saying. Every non-absent verdict needs a quote.
+
+A SHARED directive is removable only when it is **duplicate on every harness**
+— duplicate on one and absent on another means keep. Per-harness sections need
+only their own harness's verdict.
 
 ## Step 5 — Report
 
