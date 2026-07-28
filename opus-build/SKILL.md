@@ -103,11 +103,15 @@ scaled to the stakes of the change. The first two cost no Anthropic tokens:
 - **Codex**: `/codex:rescue` with a review request on the diff (OpenAI billing).
   Frame it explicitly as review-only — "report findings; do not modify files" —
   the rescue agent is fix-capable and will edit if not told otherwise.
-- **OpenCode**: `opencode run "<review prompt naming the diff/branch>"` via
-  Bash with `run_in_background` (or a long explicit timeout) — a real review
-  run exceeds the default Bash timeout. OpenCode is currently the Kimi K3
-  vehicle, so this pass doubles as the Kimi review; a dedicated Kimi harness
-  may be added later.
+- **Kimi K3 (via OpenCode)**: `opencode run -m kimi-for-coding/k3 "<review
+  prompt naming the diff/branch>"` via Bash with `run_in_background` (or a
+  long explicit timeout) — a real review run exceeds the default Bash timeout.
+  Always pass `-m`: no default model is configured, so a bare `opencode run`
+  is not guaranteed to hit K3. Gotcha: `opencode run` can exit 0 with NO final
+  message when a permission auto-reject kills the run (e.g. a `cd` outside the
+  project) — instruct the reviewer: no `cd`, read-only tools, and it MUST end
+  with the deliverable. A native kimi CLI harness is a planned future addition
+  (tracked as a GitHub issue).
 - **`/code-review:code-review`** is the EXPENSIVE escalation — its agents bill
   Anthropic-side. Reserve it for high-stakes diffs the user explicitly wants
   deep-reviewed.
