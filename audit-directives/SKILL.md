@@ -13,7 +13,7 @@ routing rule says the harness wins, so a stale directive just loses, loudly).
 Neither failure is visible from inside a session. Committed snapshots of the
 harness prompts turn that invisible drift into a git diff.
 
-Repo root: `/Users/colin/dev/src/skills`. Run every command from there.
+Run every command from the repo root.
 
 ## Step 1 — Fetch
 
@@ -63,8 +63,11 @@ Sanity marker — the live prompt should contain, verbatim:
 If that string is **missing**, treat the entire Claude Code prompt as changed
 and audit it in full.
 
-Otherwise, snapshot first, then diff — so Claude Code drift becomes a git diff
-like any other harness:
+Otherwise, snapshot and diff — Claude Code drift still becomes a diff, just
+not a git one: `harness-snapshots/claude-code/` is gitignored and local-only
+(Anthropic doesn't publish this prompt, and the snapshot embeds
+machine-specific paths), so the baseline is the previous local snapshot, not
+a committed one:
 
 - `harness-snapshots/claude-code/system-prompt.txt` — the live system prompt's
   harness prose, verbatim. EXCLUDE: tool/function schemas and the tool-system
@@ -78,11 +81,12 @@ like any other harness:
   "model": "<exact model id from the environment>", "normalizations": [...]}`.
   No timestamps.
 
-Now `git diff harness-snapshots/claude-code/` scopes this audit the same way
-Step 2 scopes the others — but only if the committed snapshot came from the
-same model (check its metadata.json): the prompt varies with model and session
-settings, so a cross-model diff is noise, not drift. No committed snapshot yet,
-or a different model? This run is the baseline — audit the full prompt.
+Before overwriting, write the live prompt's prose to a temp file and `diff`
+it against the existing local snapshot; that diff scopes this audit the same
+way Step 2 scopes the others — but only if the snapshot's metadata.json names
+the same model: the prompt varies with model and session settings, so a
+cross-model diff is noise, not drift. No local snapshot yet, or a different
+model? This run is the baseline — audit the full prompt.
 
 ## Step 4 — Classify
 
@@ -117,7 +121,8 @@ One table per audited harness: directive → verdict → evidence quote from the
 harness prompt.
 
 Then propose concrete AGENT_BEHAVIOR.md edits — and **never apply them without
-explicit user approval**. Finish by offering to commit the refreshed snapshots.
+explicit user approval**. Finish by offering to commit the refreshed
+codex/opencode snapshots (the gitignored claude-code/ snapshot stays local).
 
 ## Step 6 — State the limits (always, in the report)
 
