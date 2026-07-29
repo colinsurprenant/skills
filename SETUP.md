@@ -37,6 +37,35 @@ neither processes `@`-imports, which is why the file is self-contained:
     ln -s "$REPO/AGENT_BEHAVIOR.md" ~/.codex/AGENTS.md
     ln -s "$REPO/AGENT_BEHAVIOR.md" ~/.config/opencode/AGENTS.md
 
+## Sandboxing
+
+The opus-build K3 review lane requires Anthropic's sandbox runtime — the
+bundled wrapper (`opus-build/sandbox/k3-review.sh`) refuses to run without
+it:
+
+    npm i -g @anthropic-ai/sandbox-runtime
+
+Claude Code's native Bash sandbox, in `~/.claude/settings.json` — sandboxed
+commands run without permission prompts; anything escaping the sandbox
+prompts individually:
+
+    "sandbox": {
+      "enabled": true,
+      "excludedCommands": ["docker *", "gh *"],
+      "filesystem": {
+        "allowWrite": ["~/.director"]
+      }
+    },
+    "permissions": {
+      "ask": ["Bash(dangerouslyDisableSandbox:true)"]
+    }
+
+`excludedCommands` covers the documented macOS incompatibilities (docker's
+daemon architecture, gh's Go TLS verification under Seatbelt). Grow
+`allowWrite` from evidence — the standing out-of-workspace writers you
+actually hit (`~/.director` is my session-coordination log); leave one-off
+escapes to the ask rule.
+
 ## Harness snapshots
 
 `bin/fetch-harness-prompts` refreshes `harness-snapshots/{codex,opencode}/`
