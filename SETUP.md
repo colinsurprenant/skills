@@ -1,7 +1,7 @@
 # Setup
 
 Everything is delivered by symlinks from harness config directories into this
-repo. Clone it anywhere — the links below are location-independent (the
+repo. Clone it anywhere; the links below are location-independent (the
 CLAUDE.md `@`-import is relative and resolves through the symlink's real
 path):
 
@@ -17,12 +17,12 @@ path):
 
 `CLAUDE.global.md` `@`-imports `AGENT_BEHAVIOR.md`, which delivers the
 behavior file to every session and non-fork subagent, from any entry point.
-Skill and agent bodies resolve through the symlinks at invocation time —
+Skill and agent bodies resolve through the symlinks at invocation time:
 edits land live, no session restart needed (only the name/description
 listings are snapshotted at session start).
 
 Status line, in `~/.claude/settings.json` (the one place that needs a literal
-path — point it at your clone):
+path; point it at your clone):
 
     "statusLine": {
       "type": "command",
@@ -31,7 +31,7 @@ path — point it at your clone):
 
 ## Codex CLI and OpenCode
 
-Both consume `AGENT_BEHAVIOR.md` whole through their `AGENTS.md` mechanism —
+Both consume `AGENT_BEHAVIOR.md` whole through their `AGENTS.md` mechanism;
 neither processes `@`-imports, which is why the file is self-contained:
 
     ln -s "$REPO/AGENT_BEHAVIOR.md" ~/.codex/AGENTS.md
@@ -39,13 +39,13 @@ neither processes `@`-imports, which is why the file is self-contained:
 
 ## Sandboxing
 
-The opus-build K3 review lane requires Anthropic's sandbox runtime — the
+The opus-build K3 review lane requires Anthropic's sandbox runtime; the
 bundled wrapper (`opus-build/sandbox/k3-review.sh`) refuses to run without
 it:
 
     npm i -g @anthropic-ai/sandbox-runtime
 
-Claude Code's native Bash sandbox, in `~/.claude/settings.json` — sandboxed
+Claude Code's native Bash sandbox, in `~/.claude/settings.json`. Sandboxed
 commands run without permission prompts; anything escaping the sandbox
 prompts individually:
 
@@ -62,8 +62,8 @@ prompts individually:
 
 `excludedCommands` covers the documented macOS incompatibilities (docker's
 daemon architecture, gh's Go TLS verification under Seatbelt). Grow
-`allowWrite` from evidence — the standing out-of-workspace writers you
-actually hit (`~/.director` is my session-coordination log); leave one-off
+`allowWrite` from evidence: the standing out-of-workspace writers you
+actually hit (`~/.director` is my session-coordination log). Leave one-off
 escapes to the ask rule.
 
 ## Harness snapshots
@@ -71,5 +71,5 @@ escapes to the ask rule.
 `bin/fetch-harness-prompts` refreshes `harness-snapshots/{codex,opencode}/`
 from the installed Codex binary and the sst/opencode repo.
 `harness-snapshots/claude-code/` is generated from inside a live session by
-the `audit-directives` skill and intentionally left untracked — see
+the `audit-directives` skill and intentionally left untracked; see
 [harness-snapshots/README.md](harness-snapshots/README.md).
