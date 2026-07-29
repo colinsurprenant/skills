@@ -97,8 +97,13 @@ the one no external reviewer can do — only this session knows the intent.
 
 ## Phase 4 — Breadth review (external reviewers)
 
-Once the diff passes Phase 3, run independent fresh-eyes passes in parallel,
-scaled to the stakes of the change. The first two cost no Anthropic tokens:
+Once the diff passes Phase 3, run independent fresh-eyes passes in parallel.
+Stakes scale whether this phase runs and whether to escalate to /code-review —
+not the no-cost roster: when the phase runs, both Codex and K3 run, since
+neither costs Anthropic tokens. On entering this phase, announce the roster in
+plain text; if dropping either no-cost reviewer (e.g. a harness is down), say
+so and why before dispatching — that's a call the user gets to veto, not a
+silent scaling.
 
 - **Codex**: `/codex:rescue` with a review request on the diff (OpenAI billing).
   Frame it explicitly as review-only — "report findings; do not modify files" —
