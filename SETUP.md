@@ -26,7 +26,7 @@ path; point it at your clone):
 
     "statusLine": {
       "type": "command",
-      "command": "node \"/path/to/skills/statusline.js\""
+      "command": "node \"/path/to/skills/trim/statusline.js\""
     }
 
 ## Codex CLI and OpenCode
@@ -51,7 +51,13 @@ prompts individually:
 
     "sandbox": {
       "enabled": true,
-      "excludedCommands": ["docker *", "gh *"],
+      "excludedCommands": [
+        "docker *", "gh *",
+        "git push", "git push *",
+        "git pull", "git pull *",
+        "git fetch", "git fetch *",
+        "git -C *"
+      ],
       "filesystem": {
         "allowWrite": ["~/.director"]
       }
@@ -61,7 +67,9 @@ prompts individually:
     }
 
 `excludedCommands` covers the documented macOS incompatibilities (docker's
-daemon architecture, gh's Go TLS verification under Seatbelt). Grow
+daemon architecture, gh's Go TLS verification under Seatbelt) plus network
+git: SSH cannot negotiate through the sandbox proxy, and the `git -C *`
+entry is the backstop for command shapes the plain patterns miss. Grow
 `allowWrite` from evidence: the standing out-of-workspace writers you
 actually hit (`~/.director` is my session-coordination log). Leave one-off
 escapes to the ask rule.

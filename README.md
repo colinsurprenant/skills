@@ -54,7 +54,7 @@ external harnesses, under OS-level confinement (see Sandboxing).
 
 ### Trim
 
-- **[statusline.js](statusline.js)**: status line script.
+- **[trim/statusline.js](trim/statusline.js)**: status line script.
 
 ## Sandboxing
 
