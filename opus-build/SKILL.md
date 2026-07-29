@@ -108,15 +108,29 @@ silent scaling.
 - **Codex**: `/codex:rescue` with a review request on the diff (OpenAI billing).
   Frame it explicitly as review-only — "report findings; do not modify files" —
   the rescue agent is fix-capable and will edit if not told otherwise.
-- **Kimi K3 (via OpenCode)**: `opencode run -m kimi-for-coding/k3 "<review
-  prompt naming the diff/branch>"` via Bash with `run_in_background` (or a
-  long explicit timeout) — a real review run exceeds the default Bash timeout.
-  Always pass `-m`: no default model is configured, so a bare `opencode run`
-  is not guaranteed to hit K3. Gotcha: `opencode run` can exit 0 with NO final
-  message when a permission auto-reject kills the run (e.g. a `cd` outside the
-  project) — instruct the reviewer: no `cd`, read-only tools, and it MUST end
-  with the deliverable. A native kimi CLI harness is a planned future addition
-  (tracked as a GitHub issue).
+  Sandbox pin: the plugin dispatches with `sandbox: "read-only"` +
+  `approvalPolicy: "never"` by default (verified in codex.mjs, plugin v1.0.6) —
+  OS-enforced via Seatbelt, so this reviewer mechanically cannot write. After a
+  plugin update, re-check those defaults; a change there is a roster-level
+  change to surface to the user, not silently absorb.
+- **Kimi K3 (via OpenCode)**: invoke through the sandbox wrapper bundled with
+  this skill — `~/.claude/skills/opus-build/sandbox/k3-review.sh "<review
+  prompt naming the diff/branch>"` — via Bash with `run_in_background` (or a
+  long explicit timeout): a real review run exceeds the default Bash timeout.
+  The wrapper pins `-m kimi-for-coding/k3` and runs `opencode run` under srt
+  (`@anthropic-ai/sandbox-runtime`): writes confined to OpenCode's own state
+  dirs + temp space, network confined to the Kimi API + models.dev, repo
+  readable but not writable. This lane needs the mechanical boundary: OpenCode
+  has no OS-level sandbox of its own, and it runs an open-weight model
+  headless. If srt is missing, the wrapper refuses to run — report that and
+  let the user decide; never fall back to a bare `opencode run` silently.
+  Benign noise from the sandbox: "Error starting FSEvents stream" (Seatbelt
+  blocks file watching; a headless review doesn't need it). Gotcha:
+  `opencode run` can exit 0 with NO final message when a permission
+  auto-reject kills the run (e.g. a `cd` outside the project) — instruct the
+  reviewer: no `cd`, read-only tools, and it MUST end with the deliverable.
+  A native kimi CLI harness is a planned future addition (tracked as a GitHub
+  issue).
 - **`/code-review:code-review`** is the EXPENSIVE escalation — its agents bill
   Anthropic-side. Reserve it for high-stakes diffs the user explicitly wants
   deep-reviewed.
