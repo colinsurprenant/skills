@@ -51,6 +51,10 @@ external harnesses, under OS-level confinement (see Sandboxing).
   [sandbox/](opus-build/sandbox/) confines the open-weight review lane.
 - **[agents/opus-builder.md](agents/opus-builder.md)**: the pinned-model
   build agent it dispatches to.
+- **[commands/iterate.md](commands/iterate.md)**: the discovery-driven loop
+  for fuzzy-scope work (frame, build, evaluate, decide). Its premise: in
+  discovery work the spec is an output, written at convergence rather than
+  guessed up front.
 
 ### Trim
 

@@ -14,6 +14,7 @@ path):
     ln -s "$REPO/audit-directives"       ~/.claude/skills/audit-directives
     ln -s "$REPO/opus-build"             ~/.claude/skills/opus-build
     ln -s "$REPO/agents/opus-builder.md" ~/.claude/agents/opus-builder.md
+    ln -s "$REPO/commands/iterate.md"    ~/.claude/commands/iterate.md
 
 `CLAUDE.global.md` `@`-imports `AGENT_BEHAVIOR.md`, which delivers the
 behavior file to every session and non-fork subagent, from any entry point.
