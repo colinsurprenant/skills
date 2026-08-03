@@ -131,6 +131,25 @@ silent scaling.
   reviewer: no `cd`, read-only tools, and it MUST end with the deliverable.
   A native kimi CLI harness is a planned future addition (tracked as a GitHub
   issue).
+- **Opus (OPT-IN — costs Anthropic tokens)**: invoke through the sandbox
+  wrapper bundled with this skill —
+  `~/.claude/skills/opus-build/sandbox/opus-review.sh "<review prompt naming
+  the diff/branch>"` — via Bash with `run_in_background` (or a long explicit
+  timeout): a real review run exceeds the default Bash timeout. The wrapper
+  runs headless `claude -p` under srt, pinned to `--model claude-opus-5
+  --effort xhigh`, read-only at two layers (tool allowlist + OS boundary),
+  with all MCP disabled and the same two-layer Director kill as the K3 lane.
+  Reviewers never need write access, so the boundary costs nothing — it is
+  least privilege, not distrust of Opus, and it keeps every review lane under
+  one mechanically-enforced posture. The rubric is single-sourced: the
+  wrapper strips the frontmatter from `agents/opus-reviewer.md` and uses that
+  body as its prompt preamble, so the two Opus lanes cannot drift. If srt is
+  missing the wrapper refuses to run — fall back to dispatching the
+  `opus-reviewer` agent in-session (same rubric, same model/effort pins,
+  classifier-gated instead of OS-sandboxed) and say that is what you did.
+  Unlike Codex/K3 this lane BILLS the Opus half of the shared Anthropic pool,
+  so it is not part of the default roster — offer it when the user wants an
+  Anthropic-grade fresh-eyes pass without escalating to /code-review.
 - **`/code-review:code-review`** is the EXPENSIVE escalation — its agents bill
   Anthropic-side. Reserve it for high-stakes diffs the user explicitly wants
   deep-reviewed.

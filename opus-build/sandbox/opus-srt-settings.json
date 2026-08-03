@@ -1,0 +1,24 @@
+{
+  "filesystem": {
+    "denyRead": ["~/.ssh"],
+    "allowWrite": [
+      "~/.claude",
+      "/tmp",
+      "/private/tmp",
+      "/private/var/folders"
+    ],
+    "denyWrite": [
+      "~/.director",
+      "~/.claude/settings.json",
+      "~/.claude/settings.local.json",
+      "~/.claude/agents",
+      "~/.claude/skills",
+      "~/.claude/hooks",
+      "~/.claude/commands"
+    ]
+  },
+  "network": {
+    "allowedDomains": ["api.anthropic.com", "claude.ai", "console.anthropic.com"],
+    "deniedDomains": []
+  }
+}
