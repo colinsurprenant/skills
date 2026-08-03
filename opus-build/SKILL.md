@@ -1,33 +1,49 @@
 ---
 name: opus-build
-description: Budget-split build workflow for Fable sessions — plan and review on the Fable main loop, implement on Opus subagents at xhigh effort. Use when this session runs on Fable and is about to implement a feature, fix, or refactor of substance — multiple files, new code paths, or a change that needs a test cycle — even if the user doesn't mention budget, Opus, or delegation. Not for single-file changes of a few lines, pure Q&A, investigation-only tasks, or sessions not running Fable.
+description: Split build workflow for Fable or Opus sessions — plan and review on the main loop, implement on fresh Opus subagents at xhigh effort. Use when this session runs on Fable or Opus and is about to implement a feature, fix, or refactor of substance — multiple files, new code paths, or a change that needs a test cycle — even if the user doesn't mention budget, Opus, or delegation. On a Fable main loop it is a budget split; on an Opus main loop it is a context split. Not for single-file changes of a few lines, pure Q&A, investigation-only tasks, or sessions on any other model.
 ---
 
-# opus-build — plan on Fable, build on Opus, review on Fable
+# opus-build — plan here, build on Opus, review here
 
-Why this exists: Pro/Max plans have ONE shared weekly usage pool. Fable drains it
-at ~2x Opus's rate, and Fable usage is additionally capped at 50% of the weekly
-limit. The token-heavy part of a coding task is the build loop (file reads, edits,
-test runs); the judgment-heavy parts are planning and review. Split accordingly:
-judgment stays here on Fable, volume goes to Opus agents.
+Why this exists: the token-heavy part of a coding task is the build loop (file
+reads, edits, test runs); the judgment-heavy parts are planning and review.
+Split accordingly: judgment stays on this main loop, volume goes to fresh Opus
+agents. The split pays for two different reasons, and which one applies depends
+on the model running this session.
 
-If this session is not running on Fable, say so and skip this workflow — its
-premise (the 2x drain and the 50% cap) doesn't apply, and the phases are pure
-overhead on any other model.
+- **Fable main loop — budget split.** Pro/Max plans have ONE shared weekly
+  usage pool. Fable drains it at ~2x Opus's rate, and Fable usage is
+  additionally capped at 50% of the weekly limit. Moving build volume onto
+  Opus protects the scarce half.
+- **Opus main loop — context split.** The budget argument does NOT apply: same
+  model, same pool, so delegating saves no tokens, and claiming otherwise
+  would be false. The structure still pays for reasons that were always true
+  and merely secondary on Fable — builders start on fresh context instead of
+  inheriting a loaded main loop, independent orders run in parallel, and this
+  loop stays lean enough to review well. Run the full workflow; just don't
+  advertise a saving that isn't there.
 
-On activation, announce it to the user in plain text (e.g. "opus-build is
-active") and briefly narrate the phase transitions — dispatching to Opus
-builders, returning to Fable for review — so activation is never silent.
+On any other model, say so and skip this workflow. The budget premise doesn't
+hold, and Phases 3 and 5 put review and triage on the main loop — running those
+on a weaker model than the builders is a different workflow, not this one.
+
+On activation, announce it in plain text naming the mode, e.g. "opus-build is
+active (Fable main loop: budget split)" or "opus-build is active (Opus main
+loop: context split, no budget saving)". Briefly narrate the phase transitions
+— dispatching to Opus builders, returning here for review — so activation is
+never silent.
 
 Two standing rules while this skill is active:
 
-- Keep the Fable main loop lean. Don't bulk-read files here — delegate exploration
+- Keep this main loop lean. Don't bulk-read files here — delegate exploration
   to Explore agents and keep only conclusions in context. Every token read into
   this context gets re-read on every subsequent turn.
-- Never use `fork` subagents for build work — forks always inherit Fable and
-  ignore the model override. Build agents are fresh agents with `model: opus`.
+- Never use `fork` subagents for build work — a fork inherits this session's
+  model AND its whole context, which defeats the split in either mode (and on
+  Fable it ignores the model override too, leaking volume onto the capped
+  half). Build agents are fresh agents with `model: opus`.
 
-## Phase 1 — Plan (here, on Fable)
+## Phase 1 — Plan (here, on the main loop)
 
 1. Resolve ALL ambiguity with the user now. Build agents run headless and cannot
    ask questions; anything left unresolved becomes a guess baked into code.
@@ -69,20 +85,21 @@ regardless of session settings.
 
   Pass the work orders via `args: { orders: [...] }`. Never drop a failed order
   silently — a missing result is itself a finding for Phase 3.
-- Never `fork`, and never a bare `general-purpose` agent without a model
-  override — both leak build volume back onto Fable.
+- Never `fork`. Never a bare `general-purpose` agent either: on Fable it
+  inherits Fable and leaks volume onto the capped half; on Opus it inherits the
+  right model but not `opus-builder`'s xhigh pin or its reporting contract.
 
 Serialize orders that would touch the same files: if two orders conflict, they
 weren't independent workstreams, and worktree isolation would only defer the
 merge conflict to a step nobody owns.
 
 Effort policy: always `xhigh` for builders — Anthropic's model guidance names
-xhigh the best effort for coding and agentic work, Opus is the cheap half of
-the pool, and deeper thinking on the first pass is cheaper than a redispatch
-loop mediated by Fable. The agent definition enforces this; don't override it
-downward per order.
+xhigh the best effort for coding and agentic work, and deeper thinking on the
+first pass is cheaper than a redispatch loop mediated by this main loop. On a
+Fable main loop there is a second reason: Opus is the cheap half of the pool.
+The agent definition enforces this; don't override it downward per order.
 
-## Phase 3 — First review (here, on Fable)
+## Phase 3 — First review (here, on the main loop)
 
 Review the diff against the acceptance criteria, not from scratch: spec
 mismatches, scope creep, missed criteria, suspicious test output. This pass is
@@ -90,7 +107,7 @@ the one no external reviewer can do — only this session knows the intent.
 
 - Trivial fix (typo-grade): fix inline.
 - Anything more: write a narrow fix order and redispatch to Opus. Don't absorb
-  build work back into the Fable loop.
+  build work back into this main loop.
 - Large diff (several hundred lines or more): don't pull it all into this
   context — dispatch an Opus agent to produce a criteria-by-criteria
   verification report and review that instead.
@@ -99,11 +116,19 @@ the one no external reviewer can do — only this session knows the intent.
 
 Once the diff passes Phase 3, run independent fresh-eyes passes in parallel.
 Stakes scale whether this phase runs and whether to escalate to /code-review —
-not the no-cost roster: when the phase runs, both Codex and K3 run, since
-neither costs Anthropic tokens. On entering this phase, announce the roster in
-plain text; if dropping either no-cost reviewer (e.g. a harness is down), say
-so and why before dispatching — that's a call the user gets to veto, not a
-silent scaling.
+not the no-cost roster: when the phase runs, every no-cost lane that is
+INSTALLED runs, since none of them costs Anthropic tokens.
+
+The roster is what this machine actually has, not a fixed list — `bin/doctor`
+in the skills repo reports which lanes are live. A tool that isn't installed
+is a legitimate reason to skip its lane and needs no veto. What still needs
+saying out loud: announce the roster in plain text on entering this phase, and
+name any lane you skipped along with which kind of skip it was — "not
+installed" and "installed but the harness is down" are different facts and the
+user should get the right one. Dropping an INSTALLED no-cost reviewer remains a
+judgment call the user gets to veto, not silent scaling. If no external lane is
+available at all, say so and either offer the in-session `opus-reviewer` agent
+(Anthropic-billed, so ask first) or skip the phase.
 
 - **Codex**: `/codex:rescue` with a review request on the diff (OpenAI billing).
   Frame it explicitly as review-only — "report findings; do not modify files" —
@@ -157,17 +182,21 @@ silent scaling.
 Skip this phase entirely for low-stakes changes; Phase 3 plus passing tests is
 enough.
 
-## Phase 5 — Triage and close (here, on Fable)
+## Phase 5 — Triage and close (here, on the main loop)
 
 Adjudicate external findings (expect noise), dispatch real fixes to Opus, then
 summarize: what shipped, who reviewed what, which findings were rejected and why.
 
-## Budget hygiene
+## Budget hygiene (Fable main loop only)
+
+In context-split mode there is no budget claim to verify: same model, same pool.
+These apply when the main loop is Fable.
 
 - First few uses: ask the user to check `/usage` — the build volume must appear
   under Opus, not Fable. This attribution is not confirmed anywhere in the
-  docs: if build volume lands under Fable, this skill saves nothing — stop,
-  tell the user, and drop the delegation until the mechanics are understood.
+  docs: if build volume lands under Fable, the budget split saves nothing —
+  stop, tell the user, and drop the delegation until the mechanics are
+  understood.
 - Session effort for the Fable main loop is the user's call: `high` for
   day-to-day orchestration, `xhigh` for sessions centered on hard design work.
   Thinking tokens bill as output tokens, so effort is a real Fable-budget lever.
