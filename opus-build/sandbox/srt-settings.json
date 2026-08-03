@@ -9,7 +9,7 @@
       "/private/tmp",
       "/private/var/folders"
     ],
-    "denyWrite": []
+    "denyWrite": ["~/.director"]
   },
   "network": {
     "allowedDomains": ["api.kimi.com", "models.dev"],
