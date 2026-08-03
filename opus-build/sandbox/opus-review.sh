@@ -47,6 +47,8 @@ rubric="$(awk 'f>1; /^---[[:space:]]*$/{f++}' "$rubric_file")"
 # env -u CLAUDECODE: the child must not think it's nested inside this session.
 # DIRECTOR_BIN=/dev/null: same two-layer Director kill as the K3 lane — sole
 #   resolution candidate, non-executable, so every hook degrades to a no-op.
+#   Director is my separate session-coordination CLI, not part of this repo; if
+#   you don't have it this costs nothing and can stay as-is.
 # --strict-mcp-config with no --mcp-config: zero MCP servers — none are needed
 #   to read a diff, and their sockets/hosts are blocked by srt anyway.
 # --effort xhigh: explicit rather than inherited from ~/.claude/settings.json,
@@ -69,4 +71,6 @@ $1"
 # \$OPUS_REVIEW_PROMPT is escaped so the INNER shell expands it, not this one.
 # Prompt goes right after -p: --allowedTools is variadic and would swallow a
 # trailing positional argument.
-exec srt --settings "$dir/opus-srt-settings.json" -c "env -u CLAUDECODE DIRECTOR_BIN=/dev/null claude -p \"\$OPUS_REVIEW_PROMPT\" --model claude-opus-5 --effort xhigh --strict-mcp-config --allowedTools 'Read,Grep,Glob,Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git status:*)'"
+opus_model="${OPUS_MODEL:-claude-opus-5}"
+
+exec srt --settings "$dir/opus-srt-settings.json" -c "env -u CLAUDECODE DIRECTOR_BIN=/dev/null claude -p \"\$OPUS_REVIEW_PROMPT\" --model $opus_model --effort xhigh --strict-mcp-config --allowedTools 'Read,Grep,Glob,Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git status:*)'"

@@ -1,5 +1,16 @@
 # Setup
 
+This repo is a menu, not a bundle. Claude Code plus a handful of symlinks is
+the whole required install; everything else (Codex, OpenCode, Kimi K3,
+sandboxing, the status line) is optional and independent. A tool you don't
+have retires the one lane that needs it and changes nothing else.
+
+Platform note: the sandboxed review lanes use macOS Seatbelt through
+Anthropic's sandbox runtime, so those are macOS only. Every other part of the
+repo is platform independent.
+
+## Clone
+
 Everything is delivered by symlinks from harness config directories into this
 repo. Clone it anywhere; the links below are location-independent (the
 CLAUDE.md `@`-import is relative and resolves through the symlink's real
@@ -8,13 +19,24 @@ path):
     git clone https://github.com/colinsurprenant/skills
     REPO="$PWD/skills"    # or wherever you cloned it
 
-## Claude Code
+## Check what you have
 
-    ln -s "$REPO/CLAUDE.global.md"       ~/.claude/CLAUDE.md
-    ln -s "$REPO/audit-directives"       ~/.claude/skills/audit-directives
-    ln -s "$REPO/opus-build"             ~/.claude/skills/opus-build
-    ln -s "$REPO/agents/opus-builder.md" ~/.claude/agents/opus-builder.md
-    ln -s "$REPO/commands/iterate.md"    ~/.claude/commands/iterate.md
+    bin/doctor
+
+Reports which tools are installed, which symlinks resolve into this clone, and
+which opus-build review lanes are live. Run it again after any step below.
+`bin/doctor --deep` additionally verifies the OpenCode model slug, which needs
+network. Unmet checks are informational: they tell you which lane is retired,
+not that something is broken.
+
+## Required: Claude Code
+
+    ln -s "$REPO/CLAUDE.global.md"        ~/.claude/CLAUDE.md
+    ln -s "$REPO/audit-directives"        ~/.claude/skills/audit-directives
+    ln -s "$REPO/opus-build"              ~/.claude/skills/opus-build
+    ln -s "$REPO/agents/opus-builder.md"  ~/.claude/agents/opus-builder.md
+    ln -s "$REPO/agents/opus-reviewer.md" ~/.claude/agents/opus-reviewer.md
+    ln -s "$REPO/commands/iterate.md"     ~/.claude/commands/iterate.md
 
 `CLAUDE.global.md` `@`-imports `AGENT_BEHAVIOR.md`, which delivers the
 behavior file to every session and non-fork subagent, from any entry point.
@@ -22,33 +44,54 @@ Skill and agent bodies resolve through the symlinks at invocation time:
 edits land live, no session restart needed (only the name/description
 listings are snapshotted at session start).
 
-Status line, in `~/.claude/settings.json` (the one place that needs a literal
-path; point it at your clone):
+## Optional: Codex CLI and OpenCode
+
+Both consume `AGENT_BEHAVIOR.md` whole through their `AGENTS.md` mechanism;
+neither processes `@`-imports, which is why the file is self-contained. Link
+only the ones you use:
+
+    ln -s "$REPO/AGENT_BEHAVIOR.md" ~/.codex/AGENTS.md
+    ln -s "$REPO/AGENT_BEHAVIOR.md" ~/.config/opencode/AGENTS.md
+
+## Optional: status line
+
+Needs `node`. In `~/.claude/settings.json`, the one place that needs a literal
+path; point it at your clone:
 
     "statusLine": {
       "type": "command",
       "command": "node \"/path/to/skills/trim/statusline.js\""
     }
 
-## Codex CLI and OpenCode
+## Optional: opus-build review lanes
 
-Both consume `AGENT_BEHAVIOR.md` whole through their `AGENTS.md` mechanism;
-neither processes `@`-imports, which is why the file is self-contained:
+opus-build Phase 4 runs whichever of these are installed and reports the ones
+it skipped. None is required; with none of them the phase falls back to the
+in-session `opus-reviewer` agent or is skipped.
 
-    ln -s "$REPO/AGENT_BEHAVIOR.md" ~/.codex/AGENTS.md
-    ln -s "$REPO/AGENT_BEHAVIOR.md" ~/.config/opencode/AGENTS.md
+| Lane | Needs | Notes |
+| --- | --- | --- |
+| Codex | the `openai/codex-plugin-cc` Claude Code plugin | read-only by the plugin's own default |
+| Kimi K3 | `opencode`, a Kimi provider, and `srt` | set `K3_MODEL` if your provider slug differs from `kimi-for-coding/k3` |
+| Opus (sandboxed) | `claude` on PATH and `srt` | set `OPUS_MODEL` to override the pinned model |
 
-## Sandboxing
-
-The opus-build K3 review lane requires Anthropic's sandbox runtime; the
-bundled wrapper (`opus-build/sandbox/k3-review.sh`) refuses to run without
-it:
+The two sandboxed lanes refuse to run without the sandbox runtime rather than
+degrading to an unsandboxed run:
 
     npm i -g @anthropic-ai/sandbox-runtime
 
-Claude Code's native Bash sandbox, in `~/.claude/settings.json`. Sandboxed
-commands run without permission prompts; anything escaping the sandbox
-prompts individually:
+Those wrappers also neutralize Director, a separate session-coordination CLI
+of mine that is not part of this repo. If you don't have it, that wiring costs
+nothing and can stay as it is.
+
+## Optional: Claude Code Bash sandbox
+
+Off in my own settings, so treat it as opt-in rather than recommended. It
+trades permission prompts for a Seatbelt boundary: sandboxed commands run
+without prompting, anything escaping the sandbox prompts individually. That
+trade is worth it when you want commands to auto-run inside a boundary, and it
+gets in the way when your work routinely reaches outside one. Try it, and turn
+it off if the escapes outnumber the saved prompts:
 
     "sandbox": {
       "enabled": true,
@@ -63,22 +106,23 @@ prompts individually:
         "allowWrite": ["~/.director"]
       }
     },
-    "permissions": {
-      "ask": ["Bash(dangerouslyDisableSandbox:true)"]
-    }
 
 `excludedCommands` covers the documented macOS incompatibilities (docker's
 daemon architecture, gh's Go TLS verification under Seatbelt) plus network
 git: SSH cannot negotiate through the sandbox proxy, and the `git -C *`
 entry is the backstop for command shapes the plain patterns miss. Grow
 `allowWrite` from evidence: the standing out-of-workspace writers you
-actually hit (`~/.director` is my session-coordination log). Leave one-off
-escapes to the ask rule.
+actually hit (`~/.director` is my session-coordination log, drop it if you
+don't run Director).
+
+This is independent of the review-lane sandboxing above. The lanes wrap
+themselves in `srt` whatever this setting says.
 
 ## Harness snapshots
 
 `bin/fetch-harness-prompts` refreshes `harness-snapshots/{codex,opencode}/`
-from the installed Codex binary and the sst/opencode repo.
+from the installed Codex binary and the sst/opencode repo; narrow it with
+`--only codex` or `--only opencode` if you have just one.
 `harness-snapshots/claude-code/` is generated from inside a live session by
 the `audit-directives` skill and intentionally left untracked; see
 [harness-snapshots/README.md](harness-snapshots/README.md).

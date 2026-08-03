@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Sandboxed K3 review lane for opus-build Phase 4.
+# Override the model with K3_MODEL if your OpenCode provider uses another slug.
 # Wraps `opencode run -m kimi-for-coding/k3` in srt (@anthropic-ai/sandbox-runtime):
 # writes are confined to OpenCode's own state dirs + temp space, network to the
 # Kimi API and the models.dev catalog. The repo stays readable but not writable —
@@ -17,6 +18,8 @@ command -v srt >/dev/null 2>&1 || {
 
 dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# Director is my separate session-coordination CLI, not part of this repo. If you
+# don't have it these two layers cost nothing and can stay as-is.
 # Two layers keep Director out of this lane (seen live: a `director emit`
 # attempt was rejected by srt and lost a finished review's report):
 #   1. DIRECTOR_BIN=/dev/null — the universal kill switch both the OpenCode
@@ -31,4 +34,6 @@ is mechanically rejected, and a rejected action can kill your process. Never \
 run the 'director' CLI or any other state-writing command. Print your complete \
 verdict as your final message — the session that launched you records it."
 
-exec srt --settings "$dir/srt-settings.json" -c "DIRECTOR_BIN=/dev/null opencode run -m kimi-for-coding/k3 $(printf '%q' "$preamble $1")"
+k3_model="${K3_MODEL:-kimi-for-coding/k3}"
+
+exec srt --settings "$dir/srt-settings.json" -c "DIRECTOR_BIN=/dev/null opencode run -m $k3_model $(printf '%q' "$preamble $1")"

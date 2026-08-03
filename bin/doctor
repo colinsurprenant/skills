@@ -1,0 +1,118 @@
+#!/usr/bin/env bash
+# Reports which parts of this clone can actually run on this machine.
+# Nothing here is required: the repo is a menu, not a bundle. Every optional
+# tool that is missing simply retires the lane that needs it.
+#
+# Usage: bin/doctor [--deep]
+#   --deep also probes provider model lists (needs network, can be slow).
+set -uo pipefail
+
+deep=0
+[ "${1:-}" = "--deep" ] && deep=1
+
+repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
+
+ok=0; missing=0
+OK="  ok  "; NO="  --  "
+
+row() { printf '  %-38s %s %s\n' "$1" "$2" "${3:-}"; }
+
+have() { command -v "$1" >/dev/null 2>&1; }
+
+# A link counts only if it resolves INTO this clone; a link into some other
+# checkout looks fine to `test -e` and silently serves different content.
+linked() {
+  [ -L "$1" ] || return 1
+  case "$(cd "$(dirname "$1")" && cd "$(dirname "$(readlink "$1")")" 2>/dev/null && pwd -P)" in
+    "$repo"|"$repo"/*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+check_cmd() {
+  if have "$2"; then row "$1" "$OK" "$(command -v "$2")"; ok=$((ok+1)); return 0
+  else row "$1" "$NO" "${3:-not installed}"; missing=$((missing+1)); return 1; fi
+}
+
+check_link() {
+  if linked "$1"; then row "${1/#$HOME/~}" "$OK"; ok=$((ok+1)); return 0
+  elif [ -e "$1" ]; then row "${1/#$HOME/~}" "$NO" "exists but does not point into this clone"; missing=$((missing+1)); return 1
+  else row "${1/#$HOME/~}" "$NO" "${2:-not linked}"; missing=$((missing+1)); return 1; fi
+}
+
+echo
+echo "skills doctor — $repo"
+
+echo
+echo "Platform"
+case "$(uname -s)" in
+  Darwin) row "macOS $(sw_vers -productVersion 2>/dev/null || echo '?')" "$OK" "sandbox lanes supported" ;;
+  *)      row "$(uname -s)" "$NO" "sandbox lanes need macOS Seatbelt; everything else works" ;;
+esac
+
+echo
+echo "Core"
+check_cmd "claude CLI" claude "install Claude Code first"
+check_link "$HOME/.claude/CLAUDE.md" "behavior file will not load"
+
+echo
+echo "Wiring — symlinks into this clone"
+check_link "$HOME/.claude/skills/audit-directives"
+check_link "$HOME/.claude/skills/opus-build"
+check_link "$HOME/.claude/agents/opus-builder.md"
+check_link "$HOME/.claude/agents/opus-reviewer.md"
+check_link "$HOME/.claude/commands/iterate.md"
+check_link "$HOME/.codex/AGENTS.md" "optional: Codex CLI behavior file"
+check_link "$HOME/.config/opencode/AGENTS.md" "optional: OpenCode behavior file"
+
+echo
+echo "Trim"
+check_cmd "node (status line)" node "status line will not render"
+if grep -q "statusline.js" "$HOME/.claude/settings.json" 2>/dev/null; then
+  row "statusLine configured" "$OK"
+else
+  row "statusLine configured" "$NO" "add it to ~/.claude/settings.json (see SETUP.md)"
+fi
+
+echo
+echo "Sandboxing"
+check_cmd "srt (sandbox-runtime)" srt "npm i -g @anthropic-ai/sandbox-runtime"
+# A preference, not a capability: report the state, don't score it.
+if grep -q '"enabled": *true' "$HOME/.claude/settings.json" 2>/dev/null; then
+  row "Claude Code Bash sandbox" " on   " "sandboxed commands skip permission prompts"
+else
+  row "Claude Code Bash sandbox" " off  " "opt-in; see SETUP.md"
+fi
+
+echo
+echo "opus-build Phase 4 review lanes"
+lanes=0
+if grep -q "codex@openai-codex" "$HOME/.claude/plugins/installed_plugins.json" 2>/dev/null; then
+  row "Codex" "$OK" "codex plugin installed"; lanes=$((lanes+1))
+else
+  row "Codex" "$NO" "install the openai/codex-plugin-cc plugin"
+fi
+if have opencode && have srt; then
+  if [ "$deep" = 1 ]; then
+    if opencode models 2>/dev/null | grep -q "^${K3_MODEL:-kimi-for-coding/k3}$"; then
+      row "Kimi K3" "$OK" "${K3_MODEL:-kimi-for-coding/k3} available"; lanes=$((lanes+1))
+    else
+      row "Kimi K3" "$NO" "${K3_MODEL:-kimi-for-coding/k3} not in 'opencode models'"
+    fi
+  else
+    row "Kimi K3" "$OK" "opencode + srt present (model unverified; --deep to check)"; lanes=$((lanes+1))
+  fi
+else
+  row "Kimi K3" "$NO" "needs opencode$(have srt || echo ' and srt')"
+fi
+if have claude && have srt; then
+  row "Opus (sandboxed)" "$OK" "claude + srt present"; lanes=$((lanes+1))
+else
+  row "Opus (sandboxed)" "$NO" "needs claude and srt; in-session opus-reviewer agent still works"
+fi
+
+echo
+echo "$lanes of 3 review lanes live; $ok checks ok, $missing unmet."
+echo "Unmet optional checks are fine — they retire a lane, they do not break the rest."
+echo
+[ "$missing" -eq 0 ]

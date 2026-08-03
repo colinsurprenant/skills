@@ -43,14 +43,17 @@ build loop is split: judgment (planning, review) stays on the strongest
 model, implementation volume goes to Opus, and breadth review runs on
 external harnesses, under OS-level confinement (see Sandboxing).
 
-- **[opus-build/](opus-build/SKILL.md)**: the budget-split workflow. Plan
-  and review on the Fable main loop, build on Opus subagents at xhigh
-  effort, breadth-review on Codex and Kimi K3.
+- **[opus-build/](opus-build/SKILL.md)**: the split build workflow. Plan and
+  review on the main loop, build on fresh Opus subagents at xhigh effort,
+  breadth-review on whichever external lanes are installed (Codex, Kimi K3, a
+  sandboxed Opus). On a Fable main loop the split is about budget; on an Opus
+  main loop it is about context, and the skill states which mode it is in.
   [review-2026-07-27.md](opus-build/review-2026-07-27.md) is the
   adversarial review from its first validation run;
-  [sandbox/](opus-build/sandbox/) confines the open-weight review lane.
-- **[agents/opus-builder.md](agents/opus-builder.md)**: the pinned-model
-  build agent it dispatches to.
+  [sandbox/](opus-build/sandbox/) confines the headless review lanes.
+- **[agents/opus-builder.md](agents/opus-builder.md)** and
+  **[agents/opus-reviewer.md](agents/opus-reviewer.md)**: the pinned-model
+  build and review agents it dispatches to.
 - **[commands/iterate.md](commands/iterate.md)**: the discovery-driven loop
   for fuzzy-scope work (frame, build, evaluate, decide). Its premise: in
   discovery work the spec is an output, written at convergence rather than
@@ -75,23 +78,33 @@ and supervision rather than model goodwill:
 - The **Codex reviewer** is OS-sandboxed read-only by its plugin's own
   default, pinned in the opus-build skill so a plugin update that widens
   that default gets surfaced, not silently absorbed.
-- **Everything else**, the main loop and Opus build subagents included,
-  runs through Claude Code's native Bash sandbox, enabled in settings (see
-  [SETUP.md](SETUP.md)): auto-allow inside the boundary, a visible prompt
-  for any unsandboxed escape.
+- The **Opus reviewer** gets the same treatment by
+  [opus-build/sandbox/opus-review.sh](opus-build/sandbox/opus-review.sh),
+  which is the standard Phase 4 Opus path. Sandboxing a reviewer while build
+  subagents write files unsandboxed sounds inconsistent, but it is just least
+  privilege: builders need write access to do the job and reviewers never do.
+- **Everything else**, the main loop and Opus build subagents included, runs
+  with Claude Code's own permission prompts. Its native Bash sandbox is
+  available and documented in [SETUP.md](SETUP.md), but it is opt-in and off
+  in my settings: it trades prompts for a boundary, which pays off only when
+  your work mostly stays inside one.
 
 The premise: a git worktree is merge hygiene, not a security boundary. Any
 agent that runs `npm install` or a test suite executes third-party code with
 your whole account. So the boundary is mechanical wherever a lane runs
 headless or on a model without Claude's safety training; permission prompts
-only govern sessions a human is actually watching. Sandboxing is also an
-enabler, not just a shield: inside the boundary, commands auto-run without
-permission friction.
+only govern sessions a human is actually watching. Where a sandbox is on it
+is also an enabler and not only a shield: inside the boundary, commands
+auto-run without permission friction.
 
 ## Wiring
 
 See [SETUP.md](SETUP.md): everything is symlinks from harness config
-directories into this clone.
+directories into this clone. Only Claude Code and those symlinks are
+required; every other tool here is optional and retires just the lane that
+needs it. [bin/doctor](bin/doctor) reports what is installed and which lanes
+that leaves live, which is also the fastest way to see what a partial install
+gets you before committing to one.
 
 ## Forking
 
