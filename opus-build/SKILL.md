@@ -121,11 +121,15 @@ INSTALLED runs, since none of them costs Anthropic tokens.
 
 The roster is what this machine actually has, not a fixed list — `bin/doctor`
 in the skills repo reports which lanes are live. A tool that isn't installed
-is a legitimate reason to skip its lane and needs no veto. What still needs
-saying out loud: announce the roster in plain text on entering this phase, and
-name any lane you skipped along with which kind of skip it was — "not
-installed" and "installed but the harness is down" are different facts and the
-user should get the right one. Dropping an INSTALLED no-cost reviewer remains a
+is a legitimate reason to skip its lane and needs no veto — but only as a
+VERIFIED fact, never an assumption. Before calling a lane absent, run the check
+in THIS session (`bin/doctor`, or that lane's own `command -v` / plugin lookup)
+and name the check you ran. An unverified "not installed" is exactly the silent
+scaling this rule exists to prevent, wearing a more respectable hat. What
+still needs saying out loud: announce the roster in plain text on entering
+this phase, and name any lane you skipped along with which kind of skip it
+was — "not installed" and "installed but the harness is down" are different
+facts and the user should get the right one. Dropping an INSTALLED no-cost reviewer remains a
 judgment call the user gets to veto, not silent scaling. If no external lane is
 available at all, say so and either offer the in-session `opus-reviewer` agent
 (Anthropic-billed, so ask first) or skip the phase.
