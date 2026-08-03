@@ -22,8 +22,10 @@ process.stdin.on('end', () => {
     const session = data.session_id || '';
     const remaining = data.context_window?.remaining_percentage;
 
-    // Buffer = bottom slice reclaimed by autocompact; usable = 100% − buffer.
-    // Honors CLAUDE_AUTOCOMPACT_PCT_OVERRIDE (env or settings.json env block);
+    // Diagnostic only since the display moved to raw tokens: emitted as
+    // buffer_pct in the bridge file and the debug log, it no longer normalizes
+    // anything shown. Buffer = bottom slice reclaimed by autocompact; honors
+    // CLAUDE_AUTOCOMPACT_PCT_OVERRIDE (env or settings.json env block);
     // defaults to ~16.5% when unset/invalid.
     const ovr = Number(process.env.CLAUDE_AUTOCOMPACT_PCT_OVERRIDE);
     const AUTO_COMPACT_BUFFER_PCT =
@@ -49,9 +51,10 @@ process.stdin.on('end', () => {
     if (data.effort?.level) model += ` ${data.effort.level}`;
     let ctx = '';
     if (remaining != null) {
-      // Normalize: subtract buffer from remaining, scale to usable range
-      const usableRemaining = Math.max(0, ((remaining - AUTO_COMPACT_BUFFER_PCT) / (100 - AUTO_COMPACT_BUFFER_PCT)) * 100);
-      const used = Math.max(0, Math.min(100, Math.round(100 - usableRemaining)));
+      // Faithful percentage: raw tokens over the model's full context window
+      const used = windowSize && usedTokens > 0
+        ? Math.max(0, Math.min(100, Math.round((100 * usedTokens) / windowSize)))
+        : Math.max(0, Math.min(100, Math.round(100 - remaining)));
 
       // Write context metrics to a bridge file other hooks/tools can read.
       if (session) {
@@ -89,13 +92,16 @@ process.stdin.on('end', () => {
       const filled = Math.floor(used / 10);
       const bar = '█'.repeat(filled) + '░'.repeat(10 - filled);
 
-      // Color based on usable context thresholds
-      if (used < 50) {
+      // Color on absolute tokens (200k/400k on a 1M window), capped so the
+      // thresholds can never sit past 70%/90% of a smaller window — on a 200k
+      // window that lands at 140k/180k. Autocompact is off, so the wall is
+      // terminal and a small window has to warn on proximity, not on load.
+      const warnAt = Math.min(200_000, 0.70 * (windowSize || 200_000));
+      const critAt = Math.min(400_000, 0.90 * (windowSize || 200_000));
+      if (usedTokens < warnAt) {
         ctx = ` \x1b[32m${bar} ${used}%\x1b[0m`;
-      } else if (used < 65) {
+      } else if (usedTokens <= critAt) {
         ctx = ` \x1b[33m${bar} ${used}%\x1b[0m`;
-      } else if (used < 80) {
-        ctx = ` \x1b[38;5;208m${bar} ${used}%\x1b[0m`;
       } else {
         ctx = ` \x1b[5;31m💀 ${bar} ${used}%\x1b[0m`;
       }
