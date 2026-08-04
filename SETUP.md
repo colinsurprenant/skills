@@ -63,6 +63,11 @@ path; point it at your clone:
       "command": "node \"/path/to/skills/trim/statusline.js\""
     }
 
+The context bar reports raw tokens against the full window, and its colour
+bands assume autocompact is off, so they mark proximity to a hard wall. With
+autocompact enabled your session compacts well before the top bands, and the
+number no longer predicts when.
+
 ## Optional: opus-build review lanes
 
 opus-build Phase 4 runs whichever of these are installed and reports the ones

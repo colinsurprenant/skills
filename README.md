@@ -62,6 +62,9 @@ external harnesses, under OS-level confinement (see Sandboxing).
 ### Trim
 
 - **[trim/statusline.js](trim/statusline.js)**: status line script.
+- **[trim/statusline.test.sh](trim/statusline.test.sh)**: renders the status
+  line against crafted payloads and asserts the colour band. Run it directly;
+  `STATUSLINE=/path/to/other.js` points it at another build for comparison.
 
 ## Sandboxing
 
