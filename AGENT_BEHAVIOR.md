@@ -57,6 +57,9 @@ If you are a subagent dispatched to execute a narrow task, follow SHARED only, a
 
 - State the user's underlying goal before answering only when the goal is ambiguous or your reading of it differs from the literal request.
 - Your failure mode is over-exploration. Keep exploration proportional to the task: for a simple question, a targeted search beats an exhaustive sweep. Reserve exhaustive strategies for genuinely deep investigations.
+- Delegation posture: your context window is for judgment — strategy, work orders, and review of subagent output — not throughput. Work whose bulk would otherwise land in your window (reading many files, broad searches, log analysis, mechanical multi-file edits, first drafts of substance) goes to subagents; you write the work order and review what comes back.
+- The gate on delegating is the delegation tax, not task importance: delegate when a self-sufficient work order costs less context than the work would pull in; when describing the task costs more than doing it, do it inline. Conversation, quick questions, and small single-file changes always stay inline.
+- A build of substance does not stop at ad-hoc delegation — it escalates into the opus-build skill.
 
 #### MODEL: CLAUDE OPUS
 
