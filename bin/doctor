@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Reports which parts of this clone can actually run on this machine.
-# Nothing here is required: the repo is a menu, not a bundle. Every optional
-# tool that is missing simply retires the lane that needs it.
+# Only the Core checks and the core symlinks are required; the repo is a menu,
+# not a bundle, and every optional tool that is missing simply retires the
+# lane that needs it. The exit status scores required checks only.
 #
 # Usage: bin/doctor [--deep]
 #   --deep also probes provider model lists (needs network, can be slow).
@@ -12,12 +13,17 @@ deep=0
 
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 
-ok=0; missing=0
+ok=0; req_missing=0; opt_missing=0
+required=0
 OK="  ok  "; NO="  --  "
 
 row() { printf '  %-38s %s %s\n' "$1" "$2" "${3:-}"; }
 
 have() { command -v "$1" >/dev/null 2>&1; }
+
+miss() {
+  if [ "$required" = 1 ]; then req_missing=$((req_missing+1)); else opt_missing=$((opt_missing+1)); fi
+}
 
 # A link counts only if it resolves INTO this clone; a link into some other
 # checkout looks fine to `test -e` and silently serves different content.
@@ -31,13 +37,13 @@ linked() {
 
 check_cmd() {
   if have "$2"; then row "$1" "$OK" "$(command -v "$2")"; ok=$((ok+1)); return 0
-  else row "$1" "$NO" "${3:-not installed}"; missing=$((missing+1)); return 1; fi
+  else row "$1" "$NO" "${3:-not installed}"; miss; return 1; fi
 }
 
 check_link() {
   if linked "$1"; then row "${1/#$HOME/~}" "$OK"; ok=$((ok+1)); return 0
-  elif [ -e "$1" ]; then row "${1/#$HOME/~}" "$NO" "exists but does not point into this clone"; missing=$((missing+1)); return 1
-  else row "${1/#$HOME/~}" "$NO" "${2:-not linked}"; missing=$((missing+1)); return 1; fi
+  elif [ -e "$1" ]; then row "${1/#$HOME/~}" "$NO" "exists but does not point into this clone"; miss; return 1
+  else row "${1/#$HOME/~}" "$NO" "${2:-not linked}"; miss; return 1; fi
 }
 
 echo
@@ -52,6 +58,7 @@ esac
 
 echo
 echo "Core"
+required=1
 check_cmd "claude CLI" claude "install Claude Code first"
 check_link "$HOME/.claude/CLAUDE.md" "behavior file will not load"
 
@@ -62,6 +69,7 @@ check_link "$HOME/.claude/skills/opus-build"
 check_link "$HOME/.claude/agents/opus-builder.md"
 check_link "$HOME/.claude/agents/opus-reviewer.md"
 check_link "$HOME/.claude/commands/iterate.md"
+required=0
 check_link "$HOME/.codex/AGENTS.md" "optional: Codex CLI behavior file"
 check_link "$HOME/.config/opencode/AGENTS.md" "optional: OpenCode behavior file"
 
@@ -103,16 +111,23 @@ if have opencode && have srt; then
     row "Kimi K3" "$OK" "opencode + srt present (model unverified; --deep to check)"; lanes=$((lanes+1))
   fi
 else
-  row "Kimi K3" "$NO" "needs opencode$(have srt || echo ' and srt')"
+  need=""; have opencode || need="opencode"; have srt || need="${need:+$need and }srt"
+  row "Kimi K3" "$NO" "needs $need"
 fi
 if have claude && have srt; then
   row "Opus (sandboxed)" "$OK" "claude + srt present"; lanes=$((lanes+1))
 else
-  row "Opus (sandboxed)" "$NO" "needs claude and srt; in-session opus-reviewer agent still works"
+  need=""; have claude || need="claude"; have srt || need="${need:+$need and }srt"
+  row "Opus (sandboxed)" "$NO" "needs $need; in-session opus-reviewer agent still works"
 fi
 
 echo
-echo "$lanes of 3 review lanes live; $ok checks ok, $missing unmet."
-echo "Unmet optional checks are fine — they retire a lane, they do not break the rest."
+if [ "$req_missing" -eq 0 ]; then
+  echo "$lanes of 3 review lanes live; $ok checks ok, $opt_missing optional unmet."
+  echo "Unmet optional checks are fine — they retire a lane, they do not break the rest."
+else
+  echo "$lanes of 3 review lanes live; $ok checks ok, $req_missing REQUIRED unmet, $opt_missing optional unmet."
+  echo "Fix the required checks (SETUP.md, Required: Claude Code); optional ones only retire lanes."
+fi
 echo
-[ "$missing" -eq 0 ]
+[ "$req_missing" -eq 0 ]

@@ -26,17 +26,24 @@ path):
 Reports which tools are installed, which symlinks resolve into this clone, and
 which opus-build review lanes are live. Run it again after any step below.
 `bin/doctor --deep` additionally verifies the OpenCode model slug, which needs
-network. Unmet checks are informational: they tell you which lane is retired,
-not that something is broken.
+network. Unmet optional checks are informational: they tell you which lane is
+retired, not that something is broken. The exit status scores only the
+required checks, so a Claude-only install exits 0.
 
 ## Required: Claude Code
 
+    mkdir -p ~/.claude/skills ~/.claude/agents ~/.claude/commands
     ln -s "$REPO/CLAUDE.global.md"        ~/.claude/CLAUDE.md
     ln -s "$REPO/audit-directives"        ~/.claude/skills/audit-directives
     ln -s "$REPO/opus-build"              ~/.claude/skills/opus-build
     ln -s "$REPO/agents/opus-builder.md"  ~/.claude/agents/opus-builder.md
     ln -s "$REPO/agents/opus-reviewer.md" ~/.claude/agents/opus-reviewer.md
     ln -s "$REPO/commands/iterate.md"     ~/.claude/commands/iterate.md
+
+If you already have a `~/.claude/CLAUDE.md`, the first link fails rather than
+clobbering it: fold your content into your fork of `CLAUDE.global.md` (it has
+a placeholder section for durable preferences), then move the old file away
+and link.
 
 `CLAUDE.global.md` `@`-imports `AGENT_BEHAVIOR.md`, which delivers the
 behavior file to every session and non-fork subagent, from any entry point.
@@ -127,7 +134,11 @@ themselves in `srt` whatever this setting says.
 
 `bin/fetch-harness-prompts` refreshes `harness-snapshots/{codex,opencode}/`
 from the installed Codex binary and the sst/opencode repo; narrow it with
-`--only codex` or `--only opencode` if you have just one.
+`--only codex` or `--only opencode` if you have just one. The fetcher needs
+Python 3.11+ and dies when a requested harness is absent, so on a Claude-only
+install a non-zero exit here is the expected steady state: the
+`audit-directives` skill reports the failed fetch and audits against the
+committed snapshots instead.
 `harness-snapshots/claude-code/` is generated from inside a live session by
 the `audit-directives` skill and intentionally left untracked; see
 [harness-snapshots/README.md](harness-snapshots/README.md).
