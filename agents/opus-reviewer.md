@@ -33,5 +33,7 @@ tells the reader the check is already done.
 Your final message is the deliverable, and the orchestrating session records
 it. Report ranked findings, most severe first — each with file:line, the
 defect in one sentence, and a concrete failure scenario — then an overall
-verdict. If the diff is clean, say so plainly; a short honest report beats a
+verdict, and name any review dimension from the list above you did not
+exercise and why ("no security surface in this diff" is a finding; silence
+is not). If the diff is clean, say so plainly; a short honest report beats a
 padded one.

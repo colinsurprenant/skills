@@ -18,6 +18,9 @@ Run every command from the repo root.
 ## Step 1 — Fetch
 
 `bin/fetch-harness-prompts` (narrow with `--only codex` or `--only opencode`).
+Narrowing has a reporting cost: a harness not fetched this run keeps a stale
+baseline, so its clean diff in Step 2 is not evidence of no drift — that
+harness is NOT AUDITED, and Step 5 must say so.
 It writes `harness-snapshots/codex/prompt-1.txt…prompt-N.txt` and
 `harness-snapshots/opencode/<model>.txt`, each with a `metadata.json`. Codex
 ships prompts per model family — audit the file(s) marked `"active": true` in
@@ -43,7 +46,9 @@ audit is not.
 added — show up in the diff; plain `git diff` silently skips untracked files.)
 
 The diff IS the change detector. The audit's scope is the changed files only —
-a harness whose files are unchanged has nothing to audit. Read the diff hunks,
+a harness whose files are unchanged has nothing to audit, provided its
+snapshot was refreshed this run. Unchanged-after-refetch and unfetched are
+different facts; only the first means no drift. Read the diff hunks,
 not just the file list: what the harness *added* is what can now duplicate or
 contradict a directive.
 
@@ -117,8 +122,11 @@ only their own harness's verdict.
 
 ## Step 5 — Report
 
-One table per audited harness: directive → verdict → evidence quote from the
-harness prompt.
+Every harness gets an entry, always: audited ones a table (directive →
+verdict → evidence quote from the harness prompt), the rest one explicit
+line — "no drift (refetched, diff clean)" or "NOT AUDITED (baseline not
+refreshed this run)". A harness silently missing from the report reads as
+clean, which is exactly the confusion this line exists to prevent.
 
 Then propose concrete AGENT_BEHAVIOR.md edits — and **never apply them without
 explicit user approval**. Finish by offering to commit the refreshed

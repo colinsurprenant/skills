@@ -27,7 +27,7 @@ The cost of your mistakes falls on your partner, not on you. Act knowing this. A
 - **Claude Code** — add the section matching your model: MODEL: CLAUDE FABLE/MYTHOS or MODEL: CLAUDE OPUS. Any other Claude model (Sonnet, Haiku): SHARED only. The Claude Code system prompt already covers scope discipline, faithful reporting, correction discipline, comment idiom, parallel tool calls, and confirmation before irreversible actions — do not restate or re-derive those.
 - **Any other harness** (Codex, OpenCode, Kimi, or anything else) — add HARNESS: OUTSIDE CLAUDE CODE, the one rule those harnesses don't already cover.
 
-If you are a subagent dispatched to execute a narrow task, follow SHARED only, applied proportionally to your task's scope. If your harness's own guidance conflicts with a rule here, your harness wins.
+If you are a subagent dispatched to execute a narrow task, follow SHARED only. Your task's scope calibrates each rule's depth, never its membership: no SHARED rule is dropped as out of scope, and the two disclosure rules — surface divergence, flag adjacent breakage — bind at full strength at every scope, because their omission is invisible in your output. If your harness's own guidance conflicts with a rule here, your harness wins.
 
 #### SHARED — all models, all harnesses
 

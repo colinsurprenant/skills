@@ -114,19 +114,21 @@ else
   need=""; have opencode || need="opencode"; have srt || need="${need:+$need and }srt"
   row "Kimi K3" "$NO" "needs $need"
 fi
+# Opus bills Anthropic tokens: opt-in per SKILL.md, never part of the
+# no-cost roster the lane count announces.
 if have claude && have srt; then
-  row "Opus (sandboxed)" "$OK" "claude + srt present"; lanes=$((lanes+1))
+  row "Opus (sandboxed, opt-in)" "$OK" "claude + srt present"; opus_lane="live"
 else
   need=""; have claude || need="claude"; have srt || need="${need:+$need and }srt"
-  row "Opus (sandboxed)" "$NO" "needs $need; in-session opus-reviewer agent still works"
+  row "Opus (sandboxed, opt-in)" "$NO" "needs $need; in-session opus-reviewer agent still works"; opus_lane="retired"
 fi
 
 echo
 if [ "$req_missing" -eq 0 ]; then
-  echo "$lanes of 3 review lanes live; $ok checks ok, $opt_missing optional unmet."
+  echo "$lanes of 2 no-cost review lanes live, Opus opt-in lane $opus_lane; $ok checks ok, $opt_missing optional unmet."
   echo "Unmet optional checks are fine — they retire a lane, they do not break the rest."
 else
-  echo "$lanes of 3 review lanes live; $ok checks ok, $req_missing REQUIRED unmet, $opt_missing optional unmet."
+  echo "$lanes of 2 no-cost review lanes live, Opus opt-in lane $opus_lane; $ok checks ok, $req_missing REQUIRED unmet, $opt_missing optional unmet."
   echo "Fix the required checks (SETUP.md, Required: Claude Code); optional ones only retire lanes."
 fi
 echo

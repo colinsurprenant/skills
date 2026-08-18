@@ -185,8 +185,12 @@ available at all, say so and either offer the in-session `opus-reviewer` agent
   Anthropic-side. Reserve it for high-stakes diffs the user explicitly wants
   deep-reviewed.
 
-Skip this phase entirely for low-stakes changes; Phase 3 plus passing tests is
-enough.
+Skipping this phase entirely is allowed for low-stakes changes — Phase 3 plus
+passing tests is enough — but the skip takes the same shape as a lane skip:
+say you are skipping Phase 4 and name what makes the change low-stakes (size,
+blast radius, reversibility), so the call is visible and vetoable. An
+unannounced phase skip is the lane-level silent scaling this skill already
+forbids, one grain coarser.
 
 ## Phase 5 — Triage and close (here, on the main loop)
 
