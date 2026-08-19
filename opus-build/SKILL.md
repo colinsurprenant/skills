@@ -119,7 +119,9 @@ Stakes scale whether this phase runs and whether to escalate to /code-review —
 not the no-cost roster: when the phase runs, every no-cost lane that is
 INSTALLED runs, since none of them costs Anthropic tokens.
 
-The roster is what this machine actually has, not a fixed list — `bin/doctor`
+`ROSTER.md` at the repo root is the canonical role-to-model binding; the
+lanes below are its reviewer portfolio as currently bound. The roster is
+what this machine actually has, not a fixed list — `bin/doctor`
 in the skills clone reports which lanes are live; it is not on PATH, so
 resolve it through this skill's own symlink:
 `"$(dirname "$(readlink -f ~/.claude/skills/opus-build)")/bin/doctor"`. A tool
@@ -196,6 +198,13 @@ forbids, one grain coarser.
 
 Adjudicate external findings (expect noise), dispatch real fixes to Opus, then
 summarize: what shipped, who reviewed what, which findings were rejected and why.
+
+Then capture the run's tallies to the combo log, always: one
+`director emit --type note --area combo-log` with, per lane, submitted /
+accepted / rejected / unique-catch counts, plus builder facts (work orders,
+bounces, fix cycles) and any skips with their kind. The record shape lives in
+`ROSTER.md`. The summary prose is for the user; the combo log is the evidence
+future roster decisions run on — a run that skips it leaves no sample.
 
 ## Budget hygiene (Fable main loop only)
 

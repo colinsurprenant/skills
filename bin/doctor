@@ -131,5 +131,6 @@ else
   echo "$lanes of 2 no-cost review lanes live, Opus opt-in lane $opus_lane; $ok checks ok, $req_missing REQUIRED unmet, $opt_missing optional unmet."
   echo "Fix the required checks (SETUP.md, Required: Claude Code); optional ones only retire lanes."
 fi
+echo "Role-to-model bindings: ROSTER.md (this check verifies the review lanes only)."
 echo
 [ "$req_missing" -eq 0 ]
