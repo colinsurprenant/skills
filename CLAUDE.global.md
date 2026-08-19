@@ -15,3 +15,11 @@ Strict case of the above — network git operations (push, pull, fetch): always
 standalone commands from the repo's directory, never inside `&&` chains and
 never with `-C`. Chained or `-C` forms miss the sandbox exclusion list and
 trigger approval prompts.
+
+Multi-line text destined for an external tool (`gh pr create/edit/comment`
+bodies, and anything similar) goes through a file, never an inline
+`"$(cat <<'EOF' …)"` argument: the harness shell executes backtick spans
+inside the heredoc (they vanish from the posted text, and their output leaks
+as errors) and can append the heredoc terminator to the body. Write the text
+with the Write tool, then pass `--body-file <path>` (or the tool's file
+flag). Proven on a mangled PR body, 2026-08-19.
