@@ -17,9 +17,11 @@ never with `-C`. Chained or `-C` forms miss the sandbox exclusion list and
 trigger approval prompts.
 
 Multi-line text destined for an external tool (`gh pr create/edit/comment`
-bodies, and anything similar) goes through a file, never an inline
-`"$(cat <<'EOF' …)"` argument: the harness shell executes backtick spans
-inside the heredoc (they vanish from the posted text, and their output leaks
-as errors) and can append the heredoc terminator to the body. Write the text
-with the Write tool, then pass `--body-file <path>` (or the tool's file
-flag). Proven on a mangled PR body, 2026-08-19.
+bodies, `git commit -m` messages, and anything similar) goes through a file,
+never an inline `"$(cat <<'EOF' …)"` argument: the harness shell executes
+backtick spans inside the heredoc (they vanish from the posted text, and
+their output leaks as errors), can append the heredoc terminator to the
+body, or breaks the quoting outright. Write the text with the Write tool,
+then pass `--body-file <path>`, `git commit -F <path>`, or the tool's file
+flag. Proven twice on 2026-08-19: a mangled PR body, and a commit -m heredoc
+that died on a quoting error.
