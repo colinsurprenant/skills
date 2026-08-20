@@ -106,8 +106,8 @@ The design bets above are cheap to assert and hard to test, so when a
 project ships the opposite bets at scale, the evidence is worth keeping.
 
 - **[notes/roma-case-study.md](notes/roma-case-study.md)**: Sentient's
-  5,000-star ROMA framework, read against three choices this repo treats
-  as load-bearing: verification wired into the path rather than
+  ROMA framework, read against three choices this repo treats as
+  load-bearing: verification wired into the path rather than
   configured beside it, mechanical drift audits over prose promises, and
   judgment centralized on one loop rather than distributed through a
   recursive tree. ROMA shipped the opposite of each; the note records
