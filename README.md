@@ -1,7 +1,7 @@
 # skills
 
 My personal coding-agent configuration: Claude Code first, plus Codex CLI
-and OpenCode. The wiring is deliberately simple: a dozen symlinks, created
+and OpenCode. The wiring is deliberately simple: a handful of symlinks, created
 by [bin/install](bin/install) and documented in [SETUP.md](SETUP.md), no
 hardcoded paths. The persona is mine: fork and edit.
 

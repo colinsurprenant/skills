@@ -24,9 +24,9 @@ path):
     bin/install            # required Claude Code links, then doctor
     bin/install --all      # plus the Codex and OpenCode AGENTS.md links
 
-Idempotent and non-clobbering: a link already pointing into this clone is
-left alone, and any other file found at a target path is reported and kept,
-never replaced. The manual sections below are the same links spelled out,
+Idempotent and non-clobbering: a link already resolving to its documented
+target is left alone, and anything else found at a target path, a stray
+file or a link to the wrong place, is reported and kept, never replaced. The manual sections below are the same links spelled out,
 kept for transparency and for partial installs.
 
 ## Update

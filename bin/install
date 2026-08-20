@@ -25,21 +25,23 @@ made=0; kept=0; refused=0
 OK="  ok  "; NO="  --  "
 row() { printf '  %-44s %s %s\n' "${1/#$HOME/~}" "$2" "${3:-}"; }
 
-# Same test as doctor: a link counts only if it resolves INTO this clone.
-linked() {
+# Stricter than doctor's into-this-clone test: a link counts only if it
+# resolves to exactly the documented source. A link to some other file,
+# even one inside this clone, is left alone and reported like any other
+# occupant.
+links_to() { # links_to <link> <absolute expected source>
   [ -L "$1" ] || return 1
-  case "$(cd "$(dirname "$1")" && cd "$(dirname "$(readlink "$1")")" 2>/dev/null && pwd -P)" in
-    "$repo"|"$repo"/*) return 0 ;;
-    *) return 1 ;;
-  esac
+  t="$(readlink "$1")"
+  case "$t" in /*) ;; *) t="$(dirname "$1")/$t" ;; esac
+  [ "$(cd "$(dirname "$t")" 2>/dev/null && pwd -P)/$(basename "$t")" = "$2" ]
 }
 
 link() { # link <repo-relative source> <absolute target>
   src="$repo/$1"; dst="$2"
-  if linked "$dst"; then
+  if links_to "$dst" "$src"; then
     row "$dst" "$OK" "already linked"; kept=$((kept+1))
   elif [ -e "$dst" ] || [ -L "$dst" ]; then
-    row "$dst" "$NO" "exists and is not a link into this clone; left alone"; refused=$((refused+1))
+    row "$dst" "$NO" "exists and is not a link to its documented target; left alone"; refused=$((refused+1))
   else
     mkdir -p "$(dirname "$dst")"
     ln -s "$src" "$dst"

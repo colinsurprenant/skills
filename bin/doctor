@@ -25,14 +25,14 @@ miss() {
   if [ "$required" = 1 ]; then req_missing=$((req_missing+1)); else opt_missing=$((opt_missing+1)); fi
 }
 
-# A link counts only if it resolves INTO this clone; a link into some other
-# checkout looks fine to `test -e` and silently serves different content.
-linked() {
+# A link counts only if it resolves to exactly its documented target; a link
+# to some other file, even inside this clone, silently serves different
+# content and is exactly the drift this check exists to catch.
+links_to() { # links_to <link> <absolute expected target>
   [ -L "$1" ] || return 1
-  case "$(cd "$(dirname "$1")" && cd "$(dirname "$(readlink "$1")")" 2>/dev/null && pwd -P)" in
-    "$repo"|"$repo"/*) return 0 ;;
-    *) return 1 ;;
-  esac
+  t="$(readlink "$1")"
+  case "$t" in /*) ;; *) t="$(dirname "$1")/$t" ;; esac
+  [ "$(cd "$(dirname "$t")" 2>/dev/null && pwd -P)/$(basename "$t")" = "$2" ]
 }
 
 check_cmd() {
@@ -40,10 +40,10 @@ check_cmd() {
   else row "$1" "$NO" "${3:-not installed}"; miss; return 1; fi
 }
 
-check_link() {
-  if linked "$1"; then row "${1/#$HOME/~}" "$OK"; ok=$((ok+1)); return 0
-  elif [ -e "$1" ]; then row "${1/#$HOME/~}" "$NO" "exists but does not point into this clone"; miss; return 1
-  else row "${1/#$HOME/~}" "$NO" "${2:-not linked}"; miss; return 1; fi
+check_link() { # check_link <path> <repo-relative expected target> [missing-note]
+  if links_to "$1" "$repo/$2"; then row "${1/#$HOME/~}" "$OK"; ok=$((ok+1)); return 0
+  elif [ -e "$1" ] || [ -L "$1" ]; then row "${1/#$HOME/~}" "$NO" "exists but is not a link to $2"; miss; return 1
+  else row "${1/#$HOME/~}" "$NO" "${3:-not linked}"; miss; return 1; fi
 }
 
 echo
@@ -60,19 +60,19 @@ echo
 echo "Core"
 required=1
 check_cmd "claude CLI" claude "install Claude Code first"
-check_link "$HOME/.claude/CLAUDE.md" "behavior file will not load"
+check_link "$HOME/.claude/CLAUDE.md" CLAUDE.global.md "behavior file will not load"
 
 echo
 echo "Wiring — symlinks into this clone"
-check_link "$HOME/.claude/skills/audit-directives"
-check_link "$HOME/.claude/skills/opus-build"
-check_link "$HOME/.claude/agents/opus-builder.md"
-check_link "$HOME/.claude/agents/opus-reviewer.md"
-check_link "$HOME/.claude/agents/researcher.md"
-check_link "$HOME/.claude/commands/iterate.md"
+check_link "$HOME/.claude/skills/audit-directives" audit-directives
+check_link "$HOME/.claude/skills/opus-build" opus-build
+check_link "$HOME/.claude/agents/opus-builder.md" agents/opus-builder.md
+check_link "$HOME/.claude/agents/opus-reviewer.md" agents/opus-reviewer.md
+check_link "$HOME/.claude/agents/researcher.md" agents/researcher.md
+check_link "$HOME/.claude/commands/iterate.md" commands/iterate.md
 required=0
-check_link "$HOME/.codex/AGENTS.md" "optional: Codex CLI behavior file"
-check_link "$HOME/.config/opencode/AGENTS.md" "optional: OpenCode behavior file"
+check_link "$HOME/.codex/AGENTS.md" AGENT_BEHAVIOR.md "optional: Codex CLI behavior file"
+check_link "$HOME/.config/opencode/AGENTS.md" AGENT_BEHAVIOR.md "optional: OpenCode behavior file"
 
 echo
 echo "ROSTER bindings — agents/*.md frontmatter vs ROSTER.md"
