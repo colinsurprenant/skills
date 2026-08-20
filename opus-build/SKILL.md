@@ -55,6 +55,14 @@ Two standing rules while this skill is active:
    - **Acceptance criteria** — observable, checkable statements.
    - **Verification** — exact test/build commands to run.
 
+Two scoping contracts, downward and upward. Downward: an order carries
+exactly what its task's inputs require — padding it with everything the
+session knows is the context version of scope creep, and the builder pays
+for it in attention. Upward: an order whose deliverable is a synthesis (a
+verification report, a consolidated summary) names the goal the synthesis
+must answer — the deliverable answers that goal in its target form, never
+a concatenation of the raw inputs.
+
 The work order stays pure task content: AGENT_BEHAVIOR.md reaches builders
 automatically via the @-import in CLAUDE.global.md (its routing header scopes
 subagents to SHARED), and the `opus-builder` agent definition (committed
