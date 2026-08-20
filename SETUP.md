@@ -19,6 +19,27 @@ path):
     git clone https://github.com/colinsurprenant/skills
     REPO="$PWD/skills"    # or wherever you cloned it
 
+## Install
+
+    bin/install            # required Claude Code links, then doctor
+    bin/install --all      # plus the Codex and OpenCode AGENTS.md links
+
+Idempotent and non-clobbering: a link already resolving to its documented
+target is left alone, and anything else found at a target path, a stray
+file or a link to the wrong place, is reported and kept, never replaced. The manual sections below are the same links spelled out,
+kept for transparency and for partial installs.
+
+## Update
+
+    git pull
+    bin/install
+
+Content updates need only the pull: skill and agent bodies resolve through
+the symlinks at invocation time, so pulled edits are live immediately (only
+the name and description listings snapshot at session start). Rerunning
+`bin/install` covers the remaining case, a pull that introduces a new link;
+it is a no-op otherwise and ends with the doctor report.
+
 ## Check what you have
 
     bin/doctor
@@ -38,6 +59,7 @@ required checks, so a Claude-only install exits 0.
     ln -s "$REPO/opus-build"              ~/.claude/skills/opus-build
     ln -s "$REPO/agents/opus-builder.md"  ~/.claude/agents/opus-builder.md
     ln -s "$REPO/agents/opus-reviewer.md" ~/.claude/agents/opus-reviewer.md
+    ln -s "$REPO/agents/researcher.md"    ~/.claude/agents/researcher.md
     ln -s "$REPO/commands/iterate.md"     ~/.claude/commands/iterate.md
 
 If you already have a `~/.claude/CLAUDE.md`, the first link fails rather than

@@ -1,0 +1,84 @@
+#!/usr/bin/env bash
+# Creates the symlinks SETUP.md documents: the required Claude Code set by
+# default, the optional harness links by flag. Idempotent and non-clobbering:
+# a link already resolving into this clone is left alone, and anything else
+# occupying a target path is reported, never replaced. Finishes by running
+# bin/doctor, which is the referee for whether the install actually took —
+# if this script and doctor ever disagree about a link, doctor wins.
+#
+# Usage: bin/install [--codex] [--opencode] [--all]
+set -uo pipefail
+
+repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
+
+do_codex=0; do_opencode=0
+for arg in "$@"; do
+  case "$arg" in
+    --codex)    do_codex=1 ;;
+    --opencode) do_opencode=1 ;;
+    --all)      do_codex=1; do_opencode=1 ;;
+    *) echo "usage: bin/install [--codex] [--opencode] [--all]" >&2; exit 2 ;;
+  esac
+done
+
+made=0; kept=0; refused=0
+OK="  ok  "; NO="  --  "
+row() { printf '  %-44s %s %s\n' "${1/#$HOME/~}" "$2" "${3:-}"; }
+
+# Stricter than doctor's into-this-clone test: a link counts only if it
+# resolves to exactly the documented source. A link to some other file,
+# even one inside this clone, is left alone and reported like any other
+# occupant.
+links_to() { # links_to <link> <absolute expected source>
+  [ -L "$1" ] || return 1
+  t="$(readlink "$1")"
+  case "$t" in /*) ;; *) t="$(dirname "$1")/$t" ;; esac
+  [ "$(cd "$(dirname "$t")" 2>/dev/null && pwd -P)/$(basename "$t")" = "$2" ]
+}
+
+link() { # link <repo-relative source> <absolute target>
+  src="$repo/$1"; dst="$2"
+  if links_to "$dst" "$src"; then
+    row "$dst" "$OK" "already linked"; kept=$((kept+1))
+  elif [ -e "$dst" ] || [ -L "$dst" ]; then
+    row "$dst" "$NO" "exists and is not a link to its documented target; left alone"; refused=$((refused+1))
+  else
+    mkdir -p "$(dirname "$dst")"
+    ln -s "$src" "$dst"
+    row "$dst" "$OK" "created"; made=$((made+1))
+  fi
+}
+
+echo
+echo "skills install — $repo"
+
+echo
+echo "Claude Code (required set)"
+link CLAUDE.global.md        "$HOME/.claude/CLAUDE.md"
+link audit-directives        "$HOME/.claude/skills/audit-directives"
+link opus-build              "$HOME/.claude/skills/opus-build"
+link agents/opus-builder.md  "$HOME/.claude/agents/opus-builder.md"
+link agents/opus-reviewer.md "$HOME/.claude/agents/opus-reviewer.md"
+link agents/researcher.md    "$HOME/.claude/agents/researcher.md"
+link commands/iterate.md     "$HOME/.claude/commands/iterate.md"
+
+if [ "$do_codex" = 1 ]; then
+  echo
+  echo "Codex CLI"
+  link AGENT_BEHAVIOR.md "$HOME/.codex/AGENTS.md"
+fi
+
+if [ "$do_opencode" = 1 ]; then
+  echo
+  echo "OpenCode"
+  link AGENT_BEHAVIOR.md "$HOME/.config/opencode/AGENTS.md"
+fi
+
+echo
+echo "$made created, $kept already in place, $refused left alone."
+if [ "$refused" -gt 0 ]; then
+  echo "Paths left alone hold your existing content. Fold it into your fork"
+  echo "first (see SETUP.md), move the old file away, then rerun."
+fi
+
+exec "$repo/bin/doctor"
