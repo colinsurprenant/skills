@@ -5,6 +5,17 @@ and OpenCode. The wiring is deliberately simple: a dozen symlinks, created
 by [bin/install](bin/install) and documented in [SETUP.md](SETUP.md), no
 hardcoded paths. The persona is mine: fork and edit.
 
+## Quick start
+
+    git clone https://github.com/colinsurprenant/skills
+    cd skills
+    bin/install
+
+To update later: `git pull`, then `bin/install` again. Pulled edits to
+skills and agents land live through the symlinks; the rerun exists only to
+create links a pull introduced, is a no-op otherwise, and ends with the
+doctor report either way.
+
 ## What's here
 
 Three layers: a behavior contract every harness loads, a build workflow
@@ -125,17 +136,23 @@ gets you before committing to one.
 
 ## Forking
 
-The `### IDENTITY` section of AGENT_BEHAVIOR.md (the R. Daneel Olivaw
-persona) is adapted from Bill Burdick's
-[zot/humble-master](https://github.com/zot/humble-master) (MIT); rewrite it
-to taste. The transferable ideas are the routing header, the audit skill,
-and the budget-split workflow.
-
 Forking is the distribution model, not a fallback. `bin/install` wires a
 clone and `bin/doctor` referees it, but this is not a package: there are no
 releases and no compatibility promises, and the parts that make it work
 (the persona, ROSTER.md, the preferences in CLAUDE.global.md) are yours to
 own from the first day. Install the machinery, fork the identity.
+
+The identity deserves its own word. The `### IDENTITY` section of
+AGENT_BEHAVIOR.md gives the agent a working persona (R. Daneel Olivaw,
+adapted from Bill Burdick's
+[zot/humble-master](https://github.com/zot/humble-master), MIT) and frames
+the collaboration as a partnership. It is a deliberate personal choice, not
+machinery: nothing else in the repo depends on it, the routing header and
+every skill work with any persona or none, and it is the first thing to
+rewrite in a fork. Keep the structure, replace the voice.
+
+The transferable ideas are the routing header, the audit skill, the
+budget-split workflow, and the roster-verified bindings.
 
 ## License
 

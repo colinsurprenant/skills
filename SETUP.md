@@ -29,6 +29,17 @@ left alone, and any other file found at a target path is reported and kept,
 never replaced. The manual sections below are the same links spelled out,
 kept for transparency and for partial installs.
 
+## Update
+
+    git pull
+    bin/install
+
+Content updates need only the pull: skill and agent bodies resolve through
+the symlinks at invocation time, so pulled edits are live immediately (only
+the name and description listings snapshot at session start). Rerunning
+`bin/install` covers the remaining case, a pull that introduces a new link;
+it is a no-op otherwise and ends with the doctor report.
+
 ## Check what you have
 
     bin/doctor
