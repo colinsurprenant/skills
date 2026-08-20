@@ -6,18 +6,19 @@
 # bin/doctor, which is the referee for whether the install actually took —
 # if this script and doctor ever disagree about a link, doctor wins.
 #
-# Usage: bin/install [--codex] [--opencode] [--all]
+# Usage: bin/install [--codex] [--opencode] [--copilot] [--all]
 set -uo pipefail
 
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 
-do_codex=0; do_opencode=0
+do_codex=0; do_opencode=0; do_copilot=0
 for arg in "$@"; do
   case "$arg" in
     --codex)    do_codex=1 ;;
     --opencode) do_opencode=1 ;;
-    --all)      do_codex=1; do_opencode=1 ;;
-    *) echo "usage: bin/install [--codex] [--opencode] [--all]" >&2; exit 2 ;;
+    --copilot)  do_copilot=1 ;;
+    --all)      do_codex=1; do_opencode=1; do_copilot=1 ;;
+    *) echo "usage: bin/install [--codex] [--opencode] [--copilot] [--all]" >&2; exit 2 ;;
   esac
 done
 
@@ -72,6 +73,12 @@ if [ "$do_opencode" = 1 ]; then
   echo
   echo "OpenCode"
   link AGENT_BEHAVIOR.md "$HOME/.config/opencode/AGENTS.md"
+fi
+
+if [ "$do_copilot" = 1 ]; then
+  echo
+  echo "Copilot CLI"
+  link AGENT_BEHAVIOR.md "$HOME/.copilot/copilot-instructions.md"
 fi
 
 echo
