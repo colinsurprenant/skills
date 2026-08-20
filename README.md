@@ -1,7 +1,7 @@
 # skills
 
-My personal coding-agent configuration: Claude Code first, plus Codex CLI
-and OpenCode. The wiring is deliberately simple: a handful of symlinks, created
+My personal coding-agent configuration: Claude Code first, plus Codex CLI,
+OpenCode, and Copilot CLI. The wiring is deliberately simple: a handful of symlinks, created
 by [bin/install](bin/install) and documented in [SETUP.md](SETUP.md), no
 hardcoded paths. The persona is mine: fork and edit.
 
@@ -23,8 +23,9 @@ that decides where work runs, and a little cockpit trim.
 
 ### Behavior: one contract, every harness
 
-The same behavior file reaches Claude Code, Codex CLI, and OpenCode, and a
-directive only stays if the harness running it doesn't already enforce it.
+The same behavior file reaches Claude Code, Codex CLI, OpenCode, and
+Copilot CLI, and a directive only stays if the harness running it doesn't
+already enforce it.
 Keeping that true takes machinery: harness system prompts change under you,
 so they're snapshotted, diffed, and the file is audited against them.
 
@@ -35,7 +36,8 @@ so they're snapshotted, diffed, and the file is audited against them.
 - **[CLAUDE.global.md](CLAUDE.global.md)**: the `~/.claude/CLAUDE.md`
   target. It carries the `@`-import that delivers the behavior file to
   Claude Code, plus a placeholder for durable preferences. Codex and
-  OpenCode consume the file via `AGENTS.md` symlinks.
+  OpenCode consume the file via `AGENTS.md` symlinks, Copilot CLI via its
+  user-level `copilot-instructions.md`.
 - **[audit-directives/](audit-directives/SKILL.md)**: the audit skill. It
   snapshots live harness prompts, diffs them against the committed copies,
   and classifies every directive as absent, duplicate, or conflict, so

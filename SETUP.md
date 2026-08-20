@@ -22,7 +22,7 @@ path):
 ## Install
 
     bin/install            # required Claude Code links, then doctor
-    bin/install --all      # plus the Codex and OpenCode AGENTS.md links
+    bin/install --all      # plus the Codex, OpenCode, and Copilot CLI links
 
 Idempotent and non-clobbering: a link already resolving to its documented
 target is left alone, and anything else found at a target path, a stray
@@ -73,14 +73,24 @@ Skill and agent bodies resolve through the symlinks at invocation time:
 edits land live, no session restart needed (only the name/description
 listings are snapshotted at session start).
 
-## Optional: Codex CLI and OpenCode
+## Optional: Codex CLI, OpenCode, and Copilot CLI
 
-Both consume `AGENT_BEHAVIOR.md` whole through their `AGENTS.md` mechanism;
-neither processes `@`-imports, which is why the file is self-contained. Link
-only the ones you use:
+All three consume `AGENT_BEHAVIOR.md` whole: Codex and OpenCode through
+their `AGENTS.md` mechanism (neither processes `@`-imports, which is why
+the file is self-contained), Copilot CLI through its user-level
+`copilot-instructions.md`, loaded in every session regardless of cwd
+(verified against Copilot CLI 1.0.80; it does expand relative `@`-imports,
+which the file does not use). Link only the ones you use:
 
     ln -s "$REPO/AGENT_BEHAVIOR.md" ~/.codex/AGENTS.md
     ln -s "$REPO/AGENT_BEHAVIOR.md" ~/.config/opencode/AGENTS.md
+    ln -s "$REPO/AGENT_BEHAVIOR.md" ~/.copilot/copilot-instructions.md
+
+Copilot notes: the global file is additive alongside any repo-level
+instruction files (Copilot defines no precedence between instruction
+sources), and a running session does not pick up changes; they apply from
+the next session. To confirm the wiring once, run `/instructions` inside a
+session and look for "Home copilot-instructions.md" under the User group.
 
 ## Optional: status line
 

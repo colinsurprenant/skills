@@ -73,6 +73,7 @@ check_link "$HOME/.claude/commands/iterate.md" commands/iterate.md
 required=0
 check_link "$HOME/.codex/AGENTS.md" AGENT_BEHAVIOR.md "optional: Codex CLI behavior file"
 check_link "$HOME/.config/opencode/AGENTS.md" AGENT_BEHAVIOR.md "optional: OpenCode behavior file"
+check_link "$HOME/.copilot/copilot-instructions.md" AGENT_BEHAVIOR.md "optional: Copilot CLI behavior file"
 
 echo
 echo "ROSTER bindings — agents/*.md frontmatter vs ROSTER.md"
