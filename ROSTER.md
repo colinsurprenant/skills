@@ -55,8 +55,10 @@ A swap must touch every surface that encodes the old binding, in one commit:
 - `bin/doctor` lane checks (review lanes)
 - `opus-build/SKILL.md` lane descriptions (until it speaks pure roster)
 
-`bin/doctor` verifies the review lanes against what is actually installed;
-run it after every swap. Prose promises drift; doctor does not.
+`bin/doctor` verifies the review lanes against what is actually installed,
+and every Agent-tool row of the bindings table against its `agents/*.md`
+frontmatter — parsed from this file, so doctor itself never names a model.
+Run it after every swap. Prose promises drift; doctor does not.
 
 ## Combo log — the evidence stream
 

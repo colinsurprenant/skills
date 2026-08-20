@@ -68,10 +68,57 @@ check_link "$HOME/.claude/skills/audit-directives"
 check_link "$HOME/.claude/skills/opus-build"
 check_link "$HOME/.claude/agents/opus-builder.md"
 check_link "$HOME/.claude/agents/opus-reviewer.md"
+check_link "$HOME/.claude/agents/researcher.md"
 check_link "$HOME/.claude/commands/iterate.md"
 required=0
 check_link "$HOME/.codex/AGENTS.md" "optional: Codex CLI behavior file"
 check_link "$HOME/.config/opencode/AGENTS.md" "optional: OpenCode behavior file"
+
+echo
+echo "ROSTER bindings — agents/*.md frontmatter vs ROSTER.md"
+# ROSTER.md is the single place a role-to-model binding lives; this section
+# keeps its mechanically checkable surfaces honest. Rows whose access path is
+# an Agent-tool subagent must have agents/<name>.md present with model:/effort:
+# frontmatter agreeing with the table. No model is named in this script: the
+# table is the source of truth, the frontmatter is the surface under test.
+# Rows with no installable surface (main loop, built-in agents) stay prose.
+required=1
+bindings=0
+while IFS='|' read -r _ b_role b_requires b_model b_access _; do
+  b_role="$(printf '%s' "$b_role" | sed 's/^ *//;s/ *$//')"
+  b_requires="$(printf '%s' "$b_requires" | sed 's/^ *//;s/ *$//')"
+  b_model="$(printf '%s' "$b_model" | sed 's/^ *//;s/ *$//')"
+  b_access="$(printf '%s' "$b_access" | sed 's/^ *//;s/ *$//')"
+  agent="$(printf '%s' "$b_access" | sed -n 's/^Agent tool `\([^`]*\)`.*/\1/p')"
+  [ -n "$agent" ] || continue
+  bindings=$((bindings+1))
+  f="$repo/agents/$agent.md"
+  if [ ! -f "$f" ]; then
+    row "$b_role → agents/$agent.md" "$NO" "file missing"; miss; continue
+  fi
+  fm="$(awk '/^---$/{n++; next} n==1' "$f")"
+  fm_model="$(printf '%s\n' "$fm" | sed -n 's/^model:[[:space:]]*//p')"
+  fm_effort="$(printf '%s\n' "$fm" | sed -n 's/^effort:[[:space:]]*//p')"
+  fam="$(printf '%s' "$b_model" | awk '{print tolower($1)}')"
+  want_effort="$(printf '%s' "$b_requires" | sed -n 's/.*,[[:space:]]*//p')"
+  bad=""
+  case "$fm_model" in
+    *"$fam"*) ;;
+    *) bad="model '$fm_model' vs roster '$b_model'" ;;
+  esac
+  if [ -n "$want_effort" ] && [ "$fm_effort" != "$want_effort" ]; then
+    bad="${bad:+$bad; }effort '${fm_effort:-unset}' vs roster '$want_effort'"
+  fi
+  if [ -z "$bad" ]; then
+    row "$b_role → agents/$agent.md" "$OK" "$fm_model${fm_effort:+, $fm_effort}"; ok=$((ok+1))
+  else
+    row "$b_role → agents/$agent.md" "$NO" "$bad"; miss
+  fi
+done < <(grep '^|' "$repo/ROSTER.md")
+if [ "$bindings" -eq 0 ]; then
+  row "ROSTER bindings table" "$NO" "no 'Agent tool' rows parsed from ROSTER.md"; miss
+fi
+required=0
 
 echo
 echo "Trim"
@@ -131,6 +178,6 @@ else
   echo "$lanes of 2 no-cost review lanes live, Opus opt-in lane $opus_lane; $ok checks ok, $req_missing REQUIRED unmet, $opt_missing optional unmet."
   echo "Fix the required checks (SETUP.md, Required: Claude Code); optional ones only retire lanes."
 fi
-echo "Role-to-model bindings: ROSTER.md (this check verifies the review lanes only)."
+echo "Role-to-model bindings: ROSTER.md (Agent-tool rows and review lanes verified above; main-loop and built-in rows stay prose)."
 echo
 [ "$req_missing" -eq 0 ]
