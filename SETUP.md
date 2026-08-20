@@ -23,6 +23,7 @@ path):
 
     bin/install            # required Claude Code links, then doctor
     bin/install --all      # plus the Codex, OpenCode, and Copilot CLI links
+    bin/install --copilot  # or any subset: --codex, --opencode, --copilot
 
 Idempotent and non-clobbering: a link already resolving to its documented
 target is left alone, and anything else found at a target path, a stray
