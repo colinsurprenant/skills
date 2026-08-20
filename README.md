@@ -111,7 +111,8 @@ project ships the opposite bets at scale, the evidence is worth keeping.
   configured beside it, mechanical drift audits over prose promises, and
   judgment centralized on one loop rather than distributed through a
   recursive tree. ROMA shipped the opposite of each; the note records
-  what that looks like, and the two ideas of theirs worth stealing.
+  what that looks like, and credits the ideas of theirs that could
+  inspire improvements here.
 
 ## Wiring
 

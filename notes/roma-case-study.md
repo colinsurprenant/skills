@@ -103,13 +103,14 @@ declarative YAML at two levels, per role and per role-and-task-type,
 with graceful fallback, so a retrieval executor can run a cheap model
 with search tools while a code executor runs a strong one with a
 sandbox. That is the same shape as [ROSTER.md](../ROSTER.md) with one
-more dimension, and it is the shape to grow into if a role here ever
-needs per-work-kind splits. Two of its context contracts are worth
-stealing outright: executors see only the results of their declared
+more dimension, and a natural source of inspiration if a role here ever
+needs per-work-kind splits. Two of its context contracts deserve the
+same credit: executors see only the results of their declared
 dependencies, and aggregation answers the parent's goal in the parent's
-target form rather than concatenating child outputs. The checkpointing and
-observability investment (spans per agent call, a task-tree TUI) is also
-real, though off by default.
+target form rather than concatenating child outputs. Both are crisp
+statements of a discipline any work-order system could borrow from. The
+checkpointing and observability investment (spans per agent call, a
+task-tree TUI) is also real, though off by default.
 
 ## Method
 
