@@ -1,9 +1,9 @@
 # skills
 
 My personal coding-agent configuration: Claude Code first, plus Codex CLI
-and OpenCode. There is no installer, but the wiring is deliberately simple.
-A dozen symlinks, documented in [SETUP.md](SETUP.md), no hardcoded paths.
-The persona is mine: fork and edit.
+and OpenCode. The wiring is deliberately simple: a dozen symlinks, created
+by [bin/install](bin/install) and documented in [SETUP.md](SETUP.md), no
+hardcoded paths. The persona is mine: fork and edit.
 
 ## What's here
 
@@ -130,6 +130,12 @@ persona) is adapted from Bill Burdick's
 [zot/humble-master](https://github.com/zot/humble-master) (MIT); rewrite it
 to taste. The transferable ideas are the routing header, the audit skill,
 and the budget-split workflow.
+
+Forking is the distribution model, not a fallback. `bin/install` wires a
+clone and `bin/doctor` referees it, but this is not a package: there are no
+releases and no compatibility promises, and the parts that make it work
+(the persona, ROSTER.md, the preferences in CLAUDE.global.md) are yours to
+own from the first day. Install the machinery, fork the identity.
 
 ## License
 
