@@ -3,7 +3,8 @@
 # Override the model with K3_MODEL if your OpenCode provider uses another slug.
 # Wraps `opencode run -m kimi-for-coding/k3` in srt (@anthropic-ai/sandbox-runtime):
 # writes are confined to OpenCode's own state dirs + temp space, network to the
-# Kimi API and the models.dev catalog. The repo stays readable but not writable —
+# Kimi API and the model catalogs (models.dev, models.opencode.ai). The repo
+# stays readable but not writable —
 # OpenCode has no OS-level sandbox of its own, and this lane runs an open-weight
 # model headless, so the boundary must be mechanical, not model judgment.
 set -euo pipefail
@@ -36,4 +37,4 @@ verdict as your final message — the session that launched you records it."
 
 k3_model="${K3_MODEL:-kimi-for-coding/k3}"
 
-exec srt --settings "$dir/srt-settings.json" -c "DIRECTOR_BIN=/dev/null opencode run -m $k3_model $(printf '%q' "$preamble $1")"
+exec srt --settings "$dir/srt-settings.json" -c "DIRECTOR_BIN=/dev/null opencode run -m $k3_model $(printf '%q' "$preamble $1")" < /dev/null

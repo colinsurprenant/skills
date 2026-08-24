@@ -12,7 +12,7 @@
     "denyWrite": ["~/.director"]
   },
   "network": {
-    "allowedDomains": ["api.kimi.com", "models.dev"],
+    "allowedDomains": ["api.kimi.com", "models.dev", "models.opencode.ai"],
     "deniedDomains": []
   }
 }

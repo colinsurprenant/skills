@@ -73,4 +73,4 @@ $1"
 # trailing positional argument.
 opus_model="${OPUS_MODEL:-claude-opus-5}"
 
-exec srt --settings "$dir/opus-srt-settings.json" -c "env -u CLAUDECODE DIRECTOR_BIN=/dev/null claude -p \"\$OPUS_REVIEW_PROMPT\" --model $opus_model --effort xhigh --strict-mcp-config --allowedTools 'Read,Grep,Glob,Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git status:*)'"
+exec srt --settings "$dir/opus-srt-settings.json" -c "env -u CLAUDECODE DIRECTOR_BIN=/dev/null claude -p \"\$OPUS_REVIEW_PROMPT\" --model $opus_model --effort xhigh --strict-mcp-config --allowedTools 'Read,Grep,Glob,Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git status:*)'" < /dev/null

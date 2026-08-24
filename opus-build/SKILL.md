@@ -160,7 +160,8 @@ available at all, say so and either offer the in-session `opus-reviewer` agent
   long explicit timeout): a real review run exceeds the default Bash timeout.
   The wrapper pins `-m kimi-for-coding/k3` and runs `opencode run` under srt
   (`@anthropic-ai/sandbox-runtime`): writes confined to OpenCode's own state
-  dirs + temp space, network confined to the Kimi API + models.dev, repo
+  dirs + temp space, network confined to the Kimi API + the model catalogs
+  (models.dev, models.opencode.ai), repo
   readable but not writable. This lane needs the mechanical boundary: OpenCode
   has no OS-level sandbox of its own, and it runs an open-weight model
   headless. If srt is missing, the wrapper refuses to run — report that and
