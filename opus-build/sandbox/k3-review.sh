@@ -41,7 +41,9 @@ verdict as your final message — the session that launched you records it."
 
 k3_model="${K3_MODEL:-kimi-for-coding/k3}"
 
-report="${TMPDIR:-/tmp}/k3-review-$(date +%Y%m%d-%H%M%S)-$$.md"
+# mktemp, not a hand-built name: a predictable path under world-writable /tmp
+# is a symlink-attack target; mktemp creates the file itself, 0600.
+report="$(mktemp "${TMPDIR:-/tmp}/k3-review-XXXXXX")"
 echo "k3-review: tee'ing report to $report" >&2
 
 # No exec: the pipeline needs this shell. pipefail propagates srt's status.
