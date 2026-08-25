@@ -29,7 +29,11 @@ dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 #      the reviewer never hears about Director at all.
 #   2. The preamble below — covers what the kill switch can't: K3 reading
 #      about the director CLI in ambient repo docs and trying it anyway.
-# Deliver the verdict on stdout; the orchestrating session records it.
+# Deliver the verdict on stdout; the orchestrating session records it. Stdout
+# is also tee'd to a temp report file (path announced on stderr at launch) so a
+# finished review survives a killed run or an orchestrator that dies before
+# recording it — the cheap substitute for the reviewer-side write channel that
+# was considered and rejected.
 preamble="You run READ-ONLY under an OS sandbox: any write outside temp space \
 is mechanically rejected, and a rejected action can kill your process. Never \
 run the 'director' CLI or any other state-writing command. Print your complete \
@@ -37,4 +41,8 @@ verdict as your final message — the session that launched you records it."
 
 k3_model="${K3_MODEL:-kimi-for-coding/k3}"
 
-exec srt --settings "$dir/srt-settings.json" -c "DIRECTOR_BIN=/dev/null opencode run -m $k3_model $(printf '%q' "$preamble $1")" < /dev/null
+report="${TMPDIR:-/tmp}/k3-review-$(date +%Y%m%d-%H%M%S)-$$.md"
+echo "k3-review: tee'ing report to $report" >&2
+
+# No exec: the pipeline needs this shell. pipefail propagates srt's status.
+srt --settings "$dir/srt-settings.json" -c "DIRECTOR_BIN=/dev/null opencode run -m $k3_model $(printf '%q' "$preamble $1")" < /dev/null | tee "$report"

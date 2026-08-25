@@ -73,4 +73,11 @@ $1"
 # trailing positional argument.
 opus_model="${OPUS_MODEL:-claude-opus-5}"
 
-exec srt --settings "$dir/opus-srt-settings.json" -c "env -u CLAUDECODE DIRECTOR_BIN=/dev/null claude -p \"\$OPUS_REVIEW_PROMPT\" --model $opus_model --effort xhigh --strict-mcp-config --allowedTools 'Read,Grep,Glob,Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git status:*)'" < /dev/null
+# Tee stdout to a temp report file (path announced on stderr) so a finished
+# review survives a killed run or an orchestrator that dies before recording
+# it — same durability move as the K3 lane. No exec: the pipeline needs this
+# shell; pipefail propagates srt's status.
+report="${TMPDIR:-/tmp}/opus-review-$(date +%Y%m%d-%H%M%S)-$$.md"
+echo "opus-review: tee'ing report to $report" >&2
+
+srt --settings "$dir/opus-srt-settings.json" -c "env -u CLAUDECODE DIRECTOR_BIN=/dev/null claude -p \"\$OPUS_REVIEW_PROMPT\" --model $opus_model --effort xhigh --strict-mcp-config --allowedTools 'Read,Grep,Glob,Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git status:*)'" < /dev/null | tee "$report"

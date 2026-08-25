@@ -151,9 +151,21 @@ available at all, say so and either offer the in-session `opus-reviewer` agent
   the rescue agent is fix-capable and will edit if not told otherwise.
   Sandbox pin: the plugin dispatches with `sandbox: "read-only"` +
   `approvalPolicy: "never"` by default (verified in codex.mjs, plugin v1.0.6) —
-  OS-enforced via Seatbelt, so this reviewer mechanically cannot write. After a
-  plugin update, re-check those defaults; a change there is a roster-level
-  change to surface to the user, not silently absorb.
+  OS-enforced via Seatbelt, BUT not absolute: Codex runs rule-approved commands
+  OUTSIDE the sandbox, so a `~/.codex/rules` allowlist entry punches through
+  read-only (seen live 2026-08-25: a dispatched reviewer wrote to the Director
+  coordination log via an allowed `director emit`, after the machine-global
+  Director hooks injected the digest at SessionStart and the Stop emit-guard
+  told it to emit). Director is a separate session-coordination CLI, not part
+  of this repo — if you don't have it, the kill below costs nothing. Give this
+  lane the same Director kill as the others, prompt-enforced because the
+  plugin owns the spawn: tell the rescue agent to prefix the runtime
+  invocation with `DIRECTOR_BIN=/dev/null` (every hook shim honors it — no
+  digest injection, no emit nudge), and include in the review request: "Never
+  run the `director` CLI or any other state-writing command; deliver your
+  complete findings as your final message." After a plugin update, re-check
+  the sandbox defaults; a change there is a roster-level change to surface to
+  the user, not silently absorb.
 - **Kimi K3 (via OpenCode)**: invoke through the sandbox wrapper bundled with
   this skill — `~/.claude/skills/opus-build/sandbox/k3-review.sh "<review
   prompt naming the diff/branch>"` — via Bash with `run_in_background` (or a
@@ -171,6 +183,9 @@ available at all, say so and either offer the in-session `opus-reviewer` agent
   `opencode run` can exit 0 with NO final message when a permission
   auto-reject kills the run (e.g. a `cd` outside the project) — instruct the
   reviewer: no `cd`, read-only tools, and it MUST end with the deliverable.
+  The wrapper also tees stdout to a temp report file (path announced on
+  stderr at launch), so a finished review survives a killed run or an
+  orchestrator that dies before recording the verdict.
   A native kimi CLI harness is a planned future addition (tracked as a GitHub
   issue).
 - **Opus (OPT-IN — costs Anthropic tokens)**: invoke through the sandbox
@@ -185,7 +200,8 @@ available at all, say so and either offer the in-session `opus-reviewer` agent
   least privilege, not distrust of Opus, and it keeps every review lane under
   one mechanically-enforced posture. The rubric is single-sourced: the
   wrapper strips the frontmatter from `agents/opus-reviewer.md` and uses that
-  body as its prompt preamble, so the two Opus lanes cannot drift. If srt is
+  body as its prompt preamble, so the two Opus lanes cannot drift. Like the
+  K3 lane it tees stdout to a temp report file announced on stderr. If srt is
   missing the wrapper refuses to run — fall back to dispatching the
   `opus-reviewer` agent in-session (same rubric, same model/effort pins,
   classifier-gated instead of OS-sandboxed) and say that is what you did.
