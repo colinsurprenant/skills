@@ -92,12 +92,12 @@ process.stdin.on('end', () => {
       const filled = Math.floor(used / 10);
       const bar = '█'.repeat(filled) + '░'.repeat(10 - filled);
 
-      // Color on absolute tokens (200k/400k/700k on a 1M window), capped so no
+      // Color on absolute tokens (100k/200k/300k on a 1M window), capped so no
       // threshold sits past 70%/80%/90% of a smaller window — on a 200k window
-      // that lands at 140k/160k/180k. Autocompact is off, so the wall is
+      // that lands at 100k/160k/180k. Autocompact is off, so the wall is
       // terminal and a small window has to warn on proximity, not on load.
-      // The blink is reserved for the top band; covering half the range with it
-      // would make it ambient rather than a signal.
+      // The blinking skull is its own endgame band at 500k: put on the 300k red
+      // it would cover 70% of a 1M window and read as ambient, not as a signal.
       const win = windowSize || 200_000;
       // Band on the same quantity the bar shows. When token counts are absent
       // `used` falls back to remaining_percentage, so keying the color on
@@ -105,15 +105,18 @@ process.stdin.on('end', () => {
       const effTokens = windowSize && usedTokens > 0
         ? usedTokens
         : Math.round((win * used) / 100);
-      const warnAt = Math.min(200_000, 0.70 * win);
-      const critAt = Math.min(400_000, 0.80 * win);
-      const skullAt = Math.min(700_000, 0.90 * win);
+      const warnAt = Math.min(100_000, 0.70 * win);
+      const critAt = Math.min(200_000, 0.80 * win);
+      const redAt = Math.min(300_000, 0.90 * win);
+      const skullAt = Math.min(500_000, 0.95 * win);
       if (effTokens < warnAt) {
         ctx = ` \x1b[32m${bar} ${used}%\x1b[0m`;
       } else if (effTokens < critAt) {
         ctx = ` \x1b[33m${bar} ${used}%\x1b[0m`;
-      } else if (effTokens < skullAt) {
+      } else if (effTokens < redAt) {
         ctx = ` \x1b[38;5;208m${bar} ${used}%\x1b[0m`;
+      } else if (effTokens < skullAt) {
+        ctx = ` \x1b[1;31m${bar} ${used}%\x1b[0m`;
       } else {
         ctx = ` \x1b[5;31m💀 ${bar} ${used}%\x1b[0m`;
       }
