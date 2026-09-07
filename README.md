@@ -93,7 +93,10 @@ and supervision rather than model goodwill:
   srt is missing rather than degrading to an unsandboxed run.
 - The **Codex reviewer** is OS-sandboxed read-only by its plugin's own
   default, pinned in the opus-build skill so a plugin update that widens
-  that default gets surfaced, not silently absorbed.
+  that default gets surfaced, not silently absorbed. The lane is the
+  plugin's `/codex:rescue` command, shipped by OpenAI rather than defined
+  here; its dedicated review commands are user-invocable only, so the skill
+  frames the rescue agent as review-only by prompt.
 - The **Opus reviewer** gets the same treatment by
   [opus-build/sandbox/opus-review.sh](opus-build/sandbox/opus-review.sh),
   which is the standard Phase 4 Opus path. Sandboxing a reviewer while build

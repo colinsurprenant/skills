@@ -116,7 +116,7 @@ in-session `opus-reviewer` agent or is skipped.
 
 | Lane | Needs | Notes |
 | --- | --- | --- |
-| Codex | the `openai/codex-plugin-cc` Claude Code plugin | read-only by the plugin's own default |
+| Codex | the `openai/codex-plugin-cc` Claude Code plugin | read-only by the plugin's own default. The lane dispatches the plugin's own `/codex:rescue` command, not one defined here: the plugin's dedicated `/codex:review` commands are user-invocable only, so opus-build frames the fix-capable rescue agent as review-only by prompt |
 | Kimi K3 | `opencode`, a Kimi provider, and `srt` | set `K3_MODEL` if your provider slug differs from `kimi-for-coding/k3` |
 | Opus (sandboxed) | `claude` on PATH and `srt` | set `OPUS_MODEL` to override the pinned model |
 
