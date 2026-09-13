@@ -47,7 +47,11 @@ Two standing rules while this skill is active:
 
 1. Resolve ALL ambiguity with the user now. Build agents run headless and cannot
    ask questions; anything left unresolved becomes a guess baked into code.
-2. Delegate codebase exploration to Explore agents.
+2. Delegate codebase exploration to Explore agents. Their model override comes
+   from the roster, not from a guess: run
+   `"$(dirname "$(readlink -f ~/.claude/skills/opus-build)")/bin/roster-get SCOUT_MODEL"`
+   and pass what it returns as the Agent tool's `model` override on every scout
+   you dispatch.
 3. Write one work order per independent workstream. A work order is self-contained:
    - **Goal** — what to build and why (one sentence of intent).
    - **Scope** — files/modules to touch; what is explicitly out of scope.
@@ -69,11 +73,12 @@ subagents to SHARED), and the `opus-builder` agent definition (committed
 alongside this skill) carries the reporting contract — so neither needs
 repeating in every order.
 
-## Phase 2 — Build (Opus, xhigh)
+## Phase 2 — Build (Opus builders at the roster's pinned effort)
 
-Dispatch each work order to the `opus-builder` agent. Its definition pins
-`model: opus` and `effort: xhigh` in frontmatter, so both guarantees hold
-regardless of session settings.
+Dispatch each work order to the `opus-builder` agent. Its frontmatter pins the
+model and effort — rendered from `roster.conf` at the repo root by
+`bin/roster-render` (`BUILDER_MODEL` / `BUILDER_EFFORT`) — so both guarantees
+hold regardless of session settings.
 
 - One or a few orders: plain Agent calls with `subagent_type: "opus-builder"`
   and the work order as the prompt. Send independent orders in a single message
@@ -95,17 +100,20 @@ regardless of session settings.
   silently — a missing result is itself a finding for Phase 3.
 - Never `fork`. Never a bare `general-purpose` agent either: on Fable it
   inherits Fable and leaks volume onto the capped half; on Opus it inherits the
-  right model but not `opus-builder`'s xhigh pin or its reporting contract.
+  right model but not `opus-builder`'s effort pin or its reporting contract.
 
 Serialize orders that would touch the same files: if two orders conflict, they
 weren't independent workstreams, and worktree isolation would only defer the
 merge conflict to a step nobody owns.
 
-Effort policy: always `xhigh` for builders — Anthropic's model guidance names
-xhigh the best effort for coding and agentic work, and deeper thinking on the
-first pass is cheaper than a redispatch loop mediated by this main loop. On a
-Fable main loop there is a second reason: Opus is the cheap half of the pool.
-The agent definition enforces this; don't override it downward per order.
+Effort policy: builders always run at `BUILDER_EFFORT` from `roster.conf`, which
+is set to the effort Anthropic's model guidance names best for coding and
+agentic work (xhigh at the time of writing) — deeper thinking on the first pass
+is cheaper than a redispatch loop mediated by this main loop. On a Fable main
+loop there is a second reason: Opus is the cheap half of the pool. The agent
+definition enforces this and its frontmatter is rendered from `roster.conf`, so
+the policy has exactly one place to change; don't override it downward per
+order.
 
 ## Phase 3 — First review (here, on the main loop)
 
@@ -127,8 +135,9 @@ Stakes scale whether this phase runs and whether to escalate to /code-review —
 not the no-cost roster: when the phase runs, every no-cost lane that is
 INSTALLED runs, since none of them costs Anthropic tokens.
 
-`ROSTER.md` at the repo root is the canonical role-to-model binding; the
-lanes below are its reviewer portfolio as currently bound. The roster is
+`roster.conf` at the repo root is the single place models and efforts are set;
+`ROSTER.md` explains the roles and the selection logic. The lanes below are
+its reviewer portfolio as currently bound. The roster is
 what this machine actually has, not a fixed list — `bin/doctor`
 in the skills clone reports which lanes are live; it is not on PATH, so
 resolve it through this skill's own symlink:
@@ -146,9 +155,21 @@ judgment call the user gets to veto, not silent scaling. If no external lane is
 available at all, say so and either offer the in-session `opus-reviewer` agent
 (Anthropic-billed, so ask first) or skip the phase.
 
-- **Codex**: `/codex:rescue` with a review request on the diff (OpenAI billing).
+- **Codex**: `/codex:rescue` with a review request on the diff (ChatGPT plan
+  billing).
   Frame it explicitly as review-only — "report findings; do not modify files" —
   the rescue agent is fix-capable and will edit if not told otherwise.
+  Model pin — MUST: get `CODEX_MODEL` and `CODEX_EFFORT` through the one
+  reader, never by reading `roster.conf` yourself — run
+  `"$(dirname "$(readlink -f ~/.claude/skills/opus-build)")/bin/roster-get CODEX_MODEL"`
+  and the same for `CODEX_EFFORT` (same resolution idiom as `bin/doctor`
+  above) — then include `--model <value> --effort <value>`, with the two values
+  it returned, in the `/codex:rescue` request text, so the rescue agent
+  forwards them to the runtime. Verified in
+  the plugin's `agents/codex-rescue.md` and `commands/rescue.md`: an explicit
+  `--model`/`--effort` is passed through verbatim to `codex-companion.mjs
+  task`, and both are left unset otherwise — which is why this lane silently
+  tracked `~/.codex/config.toml`.
   Sandbox pin: the plugin dispatches with `sandbox: "read-only"` +
   `approvalPolicy: "never"` by default (verified in codex.mjs, plugin v1.0.6) —
   OS-enforced via Seatbelt, BUT not absolute: Codex runs rule-approved commands
@@ -170,7 +191,8 @@ available at all, say so and either offer the in-session `opus-reviewer` agent
   this skill — `~/.claude/skills/opus-build/sandbox/k3-review.sh "<review
   prompt naming the diff/branch>"` — via Bash with `run_in_background` (or a
   long explicit timeout): a real review run exceeds the default Bash timeout.
-  The wrapper pins `-m kimi-for-coding/k3` and runs `opencode run` under srt
+  The wrapper pins the model (and the optional `--variant` reasoning effort)
+  from `roster.conf` at the repo root, and runs `opencode run` under srt
   (`@anthropic-ai/sandbox-runtime`): writes confined to OpenCode's own state
   dirs + temp space, network confined to the Kimi API + the model catalogs
   (models.dev, models.opencode.ai), repo
@@ -193,8 +215,9 @@ available at all, say so and either offer the in-session `opus-reviewer` agent
   `~/.claude/skills/opus-build/sandbox/opus-review.sh "<review prompt naming
   the diff/branch>"` — via Bash with `run_in_background` (or a long explicit
   timeout): a real review run exceeds the default Bash timeout. The wrapper
-  runs headless `claude -p` under srt, pinned to `--model claude-opus-5
-  --effort xhigh`, read-only at two layers (tool allowlist + OS boundary),
+  runs headless `claude -p` under srt, pinned to the model and effort in
+  `roster.conf` at the repo root, read-only at two layers (tool allowlist + OS
+  boundary),
   with all MCP disabled and the same two-layer Director kill as the K3 lane.
   Reviewers never need write access, so the boundary costs nothing — it is
   least privilege, not distrust of Opus, and it keeps every review lane under

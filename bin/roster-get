@@ -1,0 +1,95 @@
+#!/usr/bin/env bash
+# The ONE reader for roster.conf. Every consumer — bin/roster-render, bin/doctor,
+# the opus-build review wrappers — goes through this script, so validation,
+# duplicate handling, empty values and error text have exactly one definition
+# and every consumer fails the same way on the same file.
+#
+# Usage: bin/roster-get [--file <path>] KEY
+#   Prints KEY's value and exits 0. Any config fault exits 78 with a message on
+#   stderr; a usage error exits 2. --file reads another roster (tests, and any
+#   consumer that wants a roster other than this clone's).
+#
+# roster.conf is data, not shell: it is read, never sourced. The whole file is
+# validated on every call — a malformed line (CRLF, trailing whitespace), a
+# duplicate key, or an empty value on a key that is not allowed one is a fault
+# even when it sits nowhere near the requested key, because the next reader of
+# that file would hit it anyway.
+set -euo pipefail
+
+repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
+file="$repo/roster.conf"
+
+# Keys allowed to hold an empty value. Empty is a real setting for these (see
+# K3_VARIANT: omit opencode's --variant and take the provider default); for
+# every other key an empty value is a half-finished edit, not a choice.
+optional_empty=" K3_VARIANT "
+
+usage() { echo "usage: bin/roster-get [--file <path>] KEY" >&2; exit 2; }
+die()   { echo "roster-get: $*" >&2; exit 78; }
+
+key=""
+keys=0   # counted separately: an empty first positional is still a positional,
+         # so `roster-get '' KEY` is two keys and a usage error, not one key.
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --file) [ "$#" -ge 2 ] || usage; file="$2"; shift 2 ;;
+    -*)     usage ;;
+    *)      keys=$((keys+1)); key="$1"; shift ;;
+  esac
+done
+[ "$keys" -eq 1 ] || usage
+# [[ =~ ]], not grep: grep matches line by line, so a multi-line argument whose
+# first line looks like a key would pass. The bash match sees the whole string.
+[[ $key =~ ^[A-Z][A-Z0-9_]*$ ]] || usage
+
+[ -f "$file" ] || die "$file: not found"
+[ -r "$file" ] || die "$file: not readable"
+
+# Errors name the file the way its consumers talk about it; the full path only
+# appears when the file itself could not be opened, where the path is the news.
+label="$(basename "$file")"
+
+# Pass 1 — shape. Reject the whole file before answering anything, so a CRLF or
+# a trailing space fails loudly by line number instead of arriving as a missing
+# key or, worse, an empty value.
+lineno=0
+while IFS= read -r line || [ -n "$line" ]; do
+  lineno=$((lineno+1))
+  case "$line" in ''|'#'*) continue ;; esac
+  printf '%s\n' "$line" | grep -Eq '^[A-Z][A-Z0-9_]*=[^[:space:]]*$' \
+    || die "$label:$lineno: not a KEY=value line (check for CRLF or trailing whitespace): $line"
+done < "$file"
+
+# Pass 2 — keys. A duplicate anywhere is a fault: "last one wins" silently
+# serves a value the human who edited the file did not intend. An empty value
+# anywhere is a fault for the same reason as a malformed line: the file is one
+# object, and the next reader would hit it whichever key it asked for — so the
+# verdict cannot depend on which key this call happened to want. This covers
+# the requested key too, by line number.
+seen=" "
+found=0
+value=""
+lineno=0
+while IFS= read -r line || [ -n "$line" ]; do
+  lineno=$((lineno+1))
+  case "$line" in ''|'#'*) continue ;; esac
+  k="${line%%=*}"
+  case "$seen" in
+    *" $k:"*)
+      first="${seen#* "$k":}"; first="${first%% *}"
+      die "$label: duplicate key $k (lines $first, $lineno)" ;;
+  esac
+  seen="$seen$k:$lineno "
+  v="${line#*=}"
+  if [ -z "$v" ]; then
+    case "$optional_empty" in
+      *" $k "*) ;;
+      *) die "$label:$lineno: $k is empty" ;;
+    esac
+  fi
+  if [ "$k" = "$key" ]; then found=1; value="$v"; fi
+done < "$file"
+
+[ "$found" = 1 ] || die "$label: $key not set"
+
+printf '%s\n' "$value"

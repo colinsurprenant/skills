@@ -117,8 +117,13 @@ in-session `opus-reviewer` agent or is skipped.
 | Lane | Needs | Notes |
 | --- | --- | --- |
 | Codex | the `openai/codex-plugin-cc` Claude Code plugin | read-only by the plugin's own default. The lane dispatches the plugin's own `/codex:rescue` command, not one defined here: the plugin's dedicated `/codex:review` commands are user-invocable only, so opus-build frames the fix-capable rescue agent as review-only by prompt |
-| Kimi K3 | `opencode`, a Kimi provider, and `srt` | set `K3_MODEL` if your provider slug differs from `kimi-for-coding/k3` |
-| Opus (sandboxed) | `claude` on PATH and `srt` | set `OPUS_MODEL` to override the pinned model |
+| Kimi K3 | `opencode`, a Kimi provider, and `srt` | model and optional reasoning variant pinned from `roster.conf` at the repo root; change the slug there if your provider spells it differently |
+| Opus (sandboxed) | `claude` on PATH and `srt` | model and effort pinned from `roster.conf` at the repo root |
+
+Every lane takes its model and effort from `roster.conf` at the repo root, the
+one place either is set. The wrappers read it at launch, so an edit there is
+live with no reinstall. [ROSTER.md](ROSTER.md) explains the roles and which key
+feeds which lane, and `bin/doctor` prints the pins each lane will use.
 
 The two sandboxed lanes refuse to run without the sandbox runtime rather than
 degrading to an unsandboxed run:

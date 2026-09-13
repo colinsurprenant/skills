@@ -1,0 +1,166 @@
+#!/usr/bin/env bash
+# Writes the agents/*.md frontmatter from roster.conf, the one place a model or
+# effort is set on this machine. Values are read through bin/roster-get, the one
+# reader every consumer of roster.conf goes through. Only the model: and effort:
+# lines inside each agent's leading frontmatter block are rewritten; every other
+# byte of the file is left exactly as it was, so a second run changes nothing.
+# The role-to-file mapping below is hardcoded on purpose — it is the one place
+# it lives.
+#
+# Usage: bin/roster-render [--check]
+#   --check writes nothing: exits 0 if every agent file already matches
+#           roster.conf, else reports the drift and exits 1.
+#   Exit 1 means drift and nothing else — only --check can produce it. Every
+#   configuration fault exits 78 in both modes: a roster.conf fault (malformed
+#   line, duplicate key, missing or empty value, reported in bin/roster-get's
+#   own words on stderr), a missing or non-executable bin/roster-get, an agent
+#   file that is missing or whose frontmatter is unusable, and any temp-file or
+#   write failure. A usage error exits 2.
+#
+# One line per agent file, parsed by bin/install and bin/doctor:
+#   rendered agents/x.md (model=opus, effort=xhigh)
+#   unchanged agents/x.md
+#   ok agents/x.md: model=opus, effort=xhigh             (--check)
+#   drift agents/x.md: effort 'high' vs roster 'xhigh'   (--check)
+#   error agents/x.md: frontmatter has 2 model: keys, expected exactly 1
+set -euo pipefail
+
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+repo="$(cd "$here/.." && pwd -P)"
+
+check=0
+case "${1:-}" in
+  '')      ;;
+  --check) check=1 ;;
+  *)       echo "usage: bin/roster-render [--check]" >&2; exit 2 ;;
+esac
+[ "$#" -le 1 ] || { echo "usage: bin/roster-render [--check]" >&2; exit 2; }
+
+die() { echo "bin/roster-render: $*" >&2; exit 78; }
+
+# The temp file lives in agents/ next to its target, so it exists only for the
+# moment between mktemp and the rename; the trap makes sure an interrupt in
+# that window leaves no .roster-render.* behind.
+cur_tmp=""
+cleanup() { [ -z "$cur_tmp" ] || rm -f "$cur_tmp"; cur_tmp=""; }
+trap cleanup EXIT
+trap 'cleanup; exit 130' INT
+trap 'cleanup; exit 143' TERM
+
+# bin/roster-get is the one reader of roster.conf: it validates the whole file,
+# rejects duplicate keys and empty values, and owns the error text, so this
+# script never parses the roster itself — it only maps roles to files. A failed
+# read prints its own message and its exit status (78) becomes this script's,
+# via set -e on the assignment below.
+[ -x "$here/roster-get" ] || die "$here/roster-get: missing or not executable"
+need() { "$here/roster-get" "$1"; }
+
+report() { # report <rel> <why> — an error, in whichever mode we are running
+  if [ "$check" = 1 ]; then printf 'error %s: %s\n' "$1" "$2"
+  else echo "bin/roster-render: $1: $2" >&2; fi
+}
+
+# Called in an `||` context, so `set -e` is OFF inside it: every step that can
+# fail is checked explicitly, and the file is replaced only after the render
+# has fully succeeded. Reporting 'rendered' for a write that did not happen is
+# the one failure mode this script must never have.
+# Returns 0 for a clean file, 1 for drift (--check only), 78 for a fault — the
+# caller keeps the two apart so the script's own exit status can too.
+render_one() { # render_one <agent> <model> <effort>
+  local agent="$1" model="$2" effort="$3"
+  local rel="agents/$agent.md" f="$repo/agents/$agent.md"
+  local close fm n_model n_effort cur_model cur_effort bad tmp mode
+
+  [ -f "$f" ] || { report "$rel" "file missing"; return 78; }
+  [ -r "$f" ] || { report "$rel" "not readable"; return 78; }
+  [ "$(sed -n 1p "$f")" = "---" ] || { report "$rel" "no leading --- frontmatter block"; return 78; }
+  # An unterminated block would make the whole file read as frontmatter, and a
+  # second model:/effort: line would leave one copy stale after a render — the
+  # rendered file would then disagree with itself. Refuse both, in either mode.
+  close="$(awk 'NR>1 && /^---$/ {print NR; exit}' "$f")"
+  [ -n "$close" ] || { report "$rel" "frontmatter block is never closed by a --- line"; return 78; }
+
+  fm="$(awk '/^---$/{n++; next} n==1' "$f")"
+  n_model="$(printf '%s\n' "$fm" | grep -c '^model:' || true)"
+  n_effort="$(printf '%s\n' "$fm" | grep -c '^effort:' || true)"
+  [ "$n_model" -eq 1 ]  || { report "$rel" "frontmatter has $n_model model: keys, expected exactly 1";  return 78; }
+  [ "$n_effort" -eq 1 ] || { report "$rel" "frontmatter has $n_effort effort: keys, expected exactly 1"; return 78; }
+  cur_model="$(printf '%s\n' "$fm" | sed -n 's/^model:[[:space:]]*//p' | sed -n 1p)"
+  cur_effort="$(printf '%s\n' "$fm" | sed -n 's/^effort:[[:space:]]*//p' | sed -n 1p)"
+
+  if [ "$check" = 1 ]; then
+    bad=""
+    [ "$cur_model" = "$model" ] || bad="model '$cur_model' vs roster '$model'"
+    [ "$cur_effort" = "$effort" ] || bad="${bad:+$bad; }effort '$cur_effort' vs roster '$effort'"
+    if [ -n "$bad" ]; then printf 'drift %s: %s\n' "$rel" "$bad"; return 1; fi
+    printf 'ok %s: model=%s, effort=%s\n' "$rel" "$model" "$effort"
+    return 0
+  fi
+
+  # n==1 is "inside the leading frontmatter": a later --- in the body only
+  # bumps the counter past 1, so prose is never touched.
+  # Same directory as the target, so the replacement below is a rename within
+  # one filesystem: a reader sees either the whole old file or the whole new
+  # one, never a half-written agent.
+  tmp="$(mktemp "$(dirname "$f")/.roster-render.XXXXXX")" \
+    || { report "$rel" "could not create a temp file in $(dirname "$rel")/"; return 78; }
+  cur_tmp="$tmp"
+  if ! awk -v model="$model" -v effort="$effort" '
+    /^---$/            { n++; print; next }
+    n == 1 && /^model:/  { print "model: " model;   next }
+    n == 1 && /^effort:/ { print "effort: " effort; next }
+                       { print }
+  ' "$f" > "$tmp"; then
+    cleanup; report "$rel" "render failed while writing the temp file"; return 78
+  fi
+  # A zero-byte render means something went wrong upstream of the write; the
+  # source always has at least a frontmatter block, so it can never be right.
+  if [ ! -s "$tmp" ]; then
+    cleanup; report "$rel" "rendered output was empty; refusing to write"; return 78
+  fi
+  # mktemp creates the temp file 0600 and the rename carries that mode across,
+  # so put the target's own mode on it first — the mode copy is what keeps the
+  # agent files 644. (The ~/.claude/agents/*.md symlinks resolve by path, not
+  # by inode, so the new inode a rename installs leaves them valid.)
+  if [ "$(uname -s)" = Darwin ]; then mode="$(stat -f %Lp "$f" 2>/dev/null)"
+  else mode="$(stat -c %a "$f" 2>/dev/null)"; fi
+  if [ -z "$mode" ] || ! chmod "$mode" "$tmp"; then
+    cleanup; report "$rel" "could not copy the file's mode onto the temp file"; return 78
+  fi
+  if cmp -s "$f" "$tmp"; then
+    cleanup
+    printf 'unchanged %s\n' "$rel"
+    return 0
+  fi
+  if ! mv -f "$tmp" "$f"; then
+    cleanup; report "$rel" "could not replace the file; it is unchanged"; return 78
+  fi
+  cur_tmp=""
+  printf 'rendered %s (model=%s, effort=%s)\n' "$rel" "$model" "$effort"
+}
+
+builder_model="$(need BUILDER_MODEL)"
+builder_effort="$(need BUILDER_EFFORT)"
+researcher_model="$(need RESEARCHER_MODEL)"
+researcher_effort="$(need RESEARCHER_EFFORT)"
+reviewer_model="$(need OPUS_REVIEWER_MODEL)"
+reviewer_effort="$(need OPUS_REVIEWER_EFFORT)"
+
+# Every file is visited whatever the first one said — one broken agent file
+# should not hide the state of the other two — but a fault outranks drift in
+# the verdict: 78 says "this configuration cannot be rendered", 1 says only
+# "the files no longer match the roster".
+drift=0; fault=0
+score() { # score <render_one's status>
+  case "$1" in
+    0)  ;;
+    78) fault=1 ;;
+    *)  drift=$((drift+1)) ;;
+  esac
+}
+render_one opus-builder  "$builder_model"    "$builder_effort"    || score $?
+render_one researcher    "$researcher_model" "$researcher_effort" || score $?
+render_one opus-reviewer "$reviewer_model"   "$reviewer_effort"   || score $?
+
+[ "$fault" -eq 0 ] || exit 78
+[ "$drift" -eq 0 ]

@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Creates the symlinks SETUP.md documents: the required Claude Code set by
-# default, the optional harness links by flag. Idempotent and non-clobbering:
+# default, the optional harness links by flag. Renders agents/*.md frontmatter
+# from roster.conf first, so the links land on current files.
+# Idempotent and non-clobbering:
 # a link already resolving into this clone is left alone, and anything else
 # occupying a target path is reported, never replaced. Finishes by running
 # bin/doctor, which is the referee for whether the install actually took —
@@ -22,7 +24,7 @@ for arg in "$@"; do
   esac
 done
 
-made=0; kept=0; refused=0
+made=0; kept=0; refused=0; render_failed=0
 OK="  ok  "; NO="  --  "
 row() { printf '  %-44s %s %s\n' "${1/#$HOME/~}" "$2" "${3:-}"; }
 
@@ -50,6 +52,26 @@ link() { # link <repo-relative source> <absolute target>
   fi
 }
 
+# agents/*.md frontmatter is generated from roster.conf, so render it before
+# the links go in: a link should point at a file that already matches the
+# roster. bin/roster-render prints one line per agent file; each becomes a row.
+render_agents() {
+  if ! r_out="$("$repo/bin/roster-render" 2>&1)"; then
+    render_failed=1
+    while IFS= read -r r_line; do
+      [ -n "$r_line" ] || continue
+      row "bin/roster-render" "$NO" "$r_line"
+    done <<< "$r_out"
+    return
+  fi
+  while IFS= read -r r_line; do
+    [ -n "$r_line" ] || continue
+    r_verb="${r_line%% *}"; r_rest="${r_line#* }"
+    r_path="${r_rest%% *}"; r_note="${r_rest#"$r_path"}"; r_note="${r_note# }"
+    row "$r_path" "$OK" "$r_verb${r_note:+ $r_note}"
+  done <<< "$r_out"
+}
+
 echo
 echo "skills install — $repo"
 
@@ -58,6 +80,7 @@ echo "Claude Code (required set)"
 link CLAUDE.global.md        "$HOME/.claude/CLAUDE.md"
 link audit-directives        "$HOME/.claude/skills/audit-directives"
 link opus-build              "$HOME/.claude/skills/opus-build"
+render_agents
 link agents/opus-builder.md  "$HOME/.claude/agents/opus-builder.md"
 link agents/opus-reviewer.md "$HOME/.claude/agents/opus-reviewer.md"
 link agents/researcher.md    "$HOME/.claude/agents/researcher.md"
@@ -87,5 +110,15 @@ if [ "$refused" -gt 0 ]; then
   echo "Paths left alone hold your existing content. Fold it into your fork"
   echo "first (see SETUP.md), move the old file away, then rerun."
 fi
+if [ "$render_failed" = 1 ]; then
+  echo "bin/roster-render failed: agents/*.md frontmatter may not match roster.conf."
+fi
 
-exec "$repo/bin/doctor"
+# doctor is the referee for the links, but it cannot see that the render failed
+# — it reports on whatever the agent files currently say. So run it (not exec:
+# its status is a verdict to weigh, not the last word) and let a failed render
+# fail the install regardless of what doctor made of the result.
+"$repo/bin/doctor"
+doctor_status=$?
+if [ "$render_failed" = 1 ]; then exit 1; fi
+exit "$doctor_status"
