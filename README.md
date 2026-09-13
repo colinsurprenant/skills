@@ -57,10 +57,11 @@ model, implementation volume goes to Opus, and breadth review runs on
 external harnesses, under OS-level confinement (see Sandboxing).
 
 - **[opus-build/](opus-build/SKILL.md)**: the split build workflow. Plan and
-  review on the main loop, build on fresh Opus subagents at xhigh effort,
-  breadth-review on whichever external lanes are installed (Codex, Kimi K3, a
-  sandboxed Opus). On a Fable main loop the split is about budget; on an Opus
-  main loop it is about context, and the skill states which mode it is in.
+  review on the main loop, build on fresh Opus subagents at the effort pinned
+  in roster.conf, breadth-review on whichever external lanes are installed
+  (Codex, Kimi K3, a sandboxed Opus). On a Fable main loop the split is about
+  budget; on an Opus main loop it is about context, and the skill states which
+  mode it is in.
   [review-2026-07-27.md](opus-build/review-2026-07-27.md) is the
   adversarial review from its first validation run;
   [sandbox/](opus-build/sandbox/) confines the headless review lanes.
@@ -107,6 +108,11 @@ and supervision rather than model goodwill:
   available and documented in [SETUP.md](SETUP.md), but it is opt-in and off
   in my settings: it trades prompts for a boundary, which pays off only when
   your work mostly stays inside one.
+
+Every lane's model and effort is pinned from `roster.conf` at the repo root, the
+one place either is set, and the wrappers read it at launch rather than
+carrying a slug of their own. [ROSTER.md](ROSTER.md) explains the roles and
+which key feeds which lane.
 
 The premise: a git worktree is merge hygiene, not a security boundary. Any
 agent that runs `npm install` or a test suite executes third-party code with

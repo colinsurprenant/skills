@@ -4,6 +4,10 @@
 # not a bundle, and every optional tool that is missing simply retires the
 # lane that needs it. The exit status scores required checks only.
 #
+# No model or effort is named in this script. roster.conf holds every value;
+# this script reads it and checks the surfaces (agents/*.md frontmatter, the
+# review lanes) against it. ROSTER.md is prose about roles, not a data source.
+#
 # Usage: bin/doctor [--deep]
 #   --deep also probes provider model lists (needs network, can be slow).
 set -uo pipefail
@@ -46,6 +50,38 @@ check_link() { # check_link <path> <repo-relative expected target> [missing-note
   else row "${1/#$HOME/~}" "$NO" "${3:-not linked}"; miss; return 1; fi
 }
 
+# bin/roster-get is the one reader of roster.conf — the same one bin/roster-render
+# and the review wrappers go through, so doctor validates the file exactly the
+# way its consumers do instead of keeping a second, kinder parser here. Call it
+# plainly, never inside a command substitution: both globals have to survive.
+roster_val=""     # the value from the last successful read
+roster_err=""     # bin/roster-get's message from the last failed read
+roster_broken=0   # 1 once a file-level fault has been reported, to keep it to one row
+roster_read() { # roster_read <key> — 0 and roster_val, or 1 and roster_err
+  local out rc
+  out="$("$repo/bin/roster-get" "$1" 2>&1)"; rc=$?
+  roster_val=""; roster_err=""
+  if [ "$rc" -ne 0 ]; then roster_err="$out"; return 1; fi
+  roster_val="$out"
+}
+
+pin_row() { # pin_row <label> <key>… — what roster.conf pins this lane to
+  local label="$1" k vals="" from="roster.conf" bad=""
+  shift
+  for k in "$@"; do
+    if roster_read "$k"; then
+      if [ -n "$roster_val" ]; then vals="${vals:+$vals, }$roster_val"; else from="$from; $k empty"; fi
+    else
+      bad="${bad:+$bad; }$roster_err"
+    fi
+  done
+  if [ -n "$bad" ]; then
+    row "$label" "$NO" "$bad"; miss
+  else
+    row "$label" "$OK" "$vals ($from)"; ok=$((ok+1))
+  fi
+}
+
 echo
 echo "skills doctor — $repo"
 
@@ -76,48 +112,49 @@ check_link "$HOME/.config/opencode/AGENTS.md" AGENT_BEHAVIOR.md "optional: OpenC
 check_link "$HOME/.copilot/copilot-instructions.md" AGENT_BEHAVIOR.md "optional: Copilot CLI behavior file"
 
 echo
-echo "ROSTER bindings — agents/*.md frontmatter vs ROSTER.md"
-# ROSTER.md is the single place a role-to-model binding lives; this section
-# keeps its mechanically checkable surfaces honest. Rows whose access path is
-# an Agent-tool subagent must have agents/<name>.md present with model:/effort:
-# frontmatter agreeing with the table. No model is named in this script: the
-# table is the source of truth, the frontmatter is the surface under test.
-# Rows with no installable surface (main loop, built-in agents) stay prose.
+echo "roster.conf — every model and effort on this machine"
+# roster.conf is the single place a value is set; this section keeps the
+# surfaces it feeds honest. The agent rows come from bin/roster-render --check,
+# which owns the role-to-file mapping; the lane rows echo the pins the
+# opus-build wrappers read, so a swap that missed a wrapper shows up here.
 required=1
-bindings=0
-while IFS='|' read -r _ b_role b_requires b_model b_access _; do
-  b_role="$(printf '%s' "$b_role" | sed 's/^ *//;s/ *$//')"
-  b_requires="$(printf '%s' "$b_requires" | sed 's/^ *//;s/ *$//')"
-  b_model="$(printf '%s' "$b_model" | sed 's/^ *//;s/ *$//')"
-  b_access="$(printf '%s' "$b_access" | sed 's/^ *//;s/ *$//')"
-  agent="$(printf '%s' "$b_access" | sed -n 's/^Agent tool `\([^`]*\)`.*/\1/p')"
-  [ -n "$agent" ] || continue
-  bindings=$((bindings+1))
-  f="$repo/agents/$agent.md"
-  if [ ! -f "$f" ]; then
-    row "$b_role → agents/$agent.md" "$NO" "file missing"; miss; continue
+if [ ! -f "$repo/roster.conf" ]; then
+  row "roster.conf" "$NO" "missing; nothing binds a role to a model"; miss
+  roster_broken=1
+elif ! roster_read BUILDER_MODEL; then
+  # One reader, one verdict: bin/roster-get validates the whole file on every
+  # call, so a file-level fault (malformed line, duplicate key) fails every key
+  # and every consumer. Report it once, here, and skip the rows below that would
+  # each repeat the same message.
+  row "roster.conf" "$NO" "$roster_err"; miss
+  roster_broken=1
+else
+  row "roster.conf" "$OK" "$(grep -Ec '^[A-Z][A-Z0-9_]*=[^[:space:]]*$' "$repo/roster.conf") keys, valid"; ok=$((ok+1))
+  agent_rows=0; render_lines=0
+  while IFS= read -r line; do
+    [ -n "$line" ] || continue
+    render_lines=$((render_lines+1))
+    r_st="${line%% *}"; r_rest="${line#* }"
+    case "$r_st" in
+      ok|drift|error) ;;
+      *) row "bin/roster-render --check" "$NO" "$line"; miss; continue ;;
+    esac
+    agent_rows=$((agent_rows+1))
+    r_path="${r_rest%%:*}"; r_note="${r_rest#*: }"
+    if [ "$r_st" = ok ]; then row "$r_path" "$OK" "$r_note"; ok=$((ok+1))
+    else row "$r_path" "$NO" "$r_note"; miss; fi
+  done < <("$repo/bin/roster-render" --check 2>&1)
+  # Silent render: no rows and no complaint of its own is itself a failure.
+  if [ "$agent_rows" -eq 0 ] && [ "$render_lines" -eq 0 ]; then
+    row "bin/roster-render --check" "$NO" "reported no agent files"; miss
   fi
-  fm="$(awk '/^---$/{n++; next} n==1' "$f")"
-  fm_model="$(printf '%s\n' "$fm" | sed -n 's/^model:[[:space:]]*//p')"
-  fm_effort="$(printf '%s\n' "$fm" | sed -n 's/^effort:[[:space:]]*//p')"
-  fam="$(printf '%s' "$b_model" | awk '{print tolower($1)}')"
-  want_effort="$(printf '%s' "$b_requires" | sed -n 's/.*,[[:space:]]*//p')"
-  bad=""
-  case "$fm_model" in
-    *"$fam"*) ;;
-    *) bad="model '$fm_model' vs roster '$b_model'" ;;
-  esac
-  if [ -n "$want_effort" ] && [ "$fm_effort" != "$want_effort" ]; then
-    bad="${bad:+$bad; }effort '${fm_effort:-unset}' vs roster '$want_effort'"
-  fi
-  if [ -z "$bad" ]; then
-    row "$b_role → agents/$agent.md" "$OK" "$fm_model${fm_effort:+, $fm_effort}"; ok=$((ok+1))
-  else
-    row "$b_role → agents/$agent.md" "$NO" "$bad"; miss
-  fi
-done < <(grep '^|' "$repo/ROSTER.md")
-if [ "$bindings" -eq 0 ]; then
-  row "ROSTER bindings table" "$NO" "no 'Agent tool' rows parsed from ROSTER.md"; miss
+
+  # Lane pins: informational, and optional the way the lanes themselves are.
+  required=0
+  pin_row "Scout" SCOUT_MODEL
+  pin_row "Codex lane" CODEX_MODEL CODEX_EFFORT
+  pin_row "Kimi K3 lane" K3_MODEL K3_VARIANT
+  pin_row "Opus review lane" OPUS_REVIEWER_MODEL OPUS_REVIEWER_EFFORT
 fi
 required=0
 
@@ -143,20 +180,51 @@ fi
 echo
 echo "opus-build Phase 4 review lanes"
 lanes=0
-if grep -q "codex@openai-codex" "$HOME/.claude/plugins/installed_plugins.json" 2>/dev/null; then
-  row "Codex" "$OK" "codex plugin installed"; lanes=$((lanes+1))
-else
-  row "Codex" "$NO" "install the openai/codex-plugin-cc plugin"
+# Every pin below comes from the same one reader. A file-level fault was already
+# reported once in the roster section, so these rows defer to it instead of
+# repeating it three times — and never claim a key is unset when the file is.
+pin_fault="pin unknown: see the roster.conf row above"
+codex_pin="$pin_fault"; k3_model=""; k3_pin="$pin_fault"; opus_pin="$pin_fault"
+# A lane is live only if every pin behind it was read: tooling that is present
+# but aimed at an unknown model is not a working lane, so an unread pin makes
+# the row NO and keeps the lane out of the count, whatever the tooling says.
+codex_pinned=0; k3_pinned=0; opus_pinned=0
+if [ "$roster_broken" = 0 ]; then
+  codex_pinned=1; k3_pinned=1; opus_pinned=1
+  if roster_read CODEX_MODEL; then codex_pin="$roster_val"; else codex_pin="$roster_err"; codex_pinned=0; fi
+  if roster_read CODEX_EFFORT; then codex_pin="$codex_pin${roster_val:+, $roster_val}"
+  else codex_pin="$codex_pin; $roster_err"; codex_pinned=0; fi
+  if roster_read K3_MODEL; then
+    k3_model="$roster_val"; k3_pin="$k3_model"
+    if roster_read K3_VARIANT; then k3_pin="$k3_pin${roster_val:+, variant $roster_val}"
+    else k3_pin="$k3_pin; $roster_err"; k3_pinned=0; fi
+  else
+    k3_pin="$roster_err"; k3_pinned=0
+  fi
+  if roster_read OPUS_REVIEWER_MODEL; then opus_pin="$roster_val"; else opus_pin="$roster_err"; opus_pinned=0; fi
+  if roster_read OPUS_REVIEWER_EFFORT; then opus_pin="$opus_pin${roster_val:+, $roster_val}"
+  else opus_pin="$opus_pin; $roster_err"; opus_pinned=0; fi
 fi
-if have opencode && have srt; then
+if [ "$codex_pinned" = 0 ]; then
+  row "Codex" "$NO" "$codex_pin"
+elif grep -q "codex@openai-codex" "$HOME/.claude/plugins/installed_plugins.json" 2>/dev/null; then
+  row "Codex" "$OK" "codex plugin installed; $codex_pin"; lanes=$((lanes+1))
+else
+  row "Codex" "$NO" "install the openai/codex-plugin-cc plugin; $codex_pin"
+fi
+if [ "$k3_pinned" = 0 ] || [ -z "$k3_model" ]; then
+  row "Kimi K3" "$NO" "$k3_pin"
+elif have opencode && have srt; then
   if [ "$deep" = 1 ]; then
-    if opencode models 2>/dev/null | grep -q "^${K3_MODEL:-kimi-for-coding/k3}$"; then
-      row "Kimi K3" "$OK" "${K3_MODEL:-kimi-for-coding/k3} available"; lanes=$((lanes+1))
+    # -x -F --: the pin is a literal to match whole-line, not a regex; a slug
+    # with a '.' or a '+' in it would otherwise match the wrong catalog entry.
+    if opencode models 2>/dev/null | grep -qxF -- "$k3_model"; then
+      row "Kimi K3" "$OK" "$k3_pin available"; lanes=$((lanes+1))
     else
-      row "Kimi K3" "$NO" "${K3_MODEL:-kimi-for-coding/k3} not in 'opencode models'"
+      row "Kimi K3" "$NO" "$k3_model not in 'opencode models'"
     fi
   else
-    row "Kimi K3" "$OK" "opencode + srt present (model unverified; --deep to check)"; lanes=$((lanes+1))
+    row "Kimi K3" "$OK" "opencode + srt present; $k3_pin unverified (--deep to check)"; lanes=$((lanes+1))
   fi
 else
   need=""; have opencode || need="opencode"; have srt || need="${need:+$need and }srt"
@@ -164,8 +232,10 @@ else
 fi
 # Opus bills Anthropic tokens: opt-in per SKILL.md, never part of the
 # no-cost roster the lane count announces.
-if have claude && have srt; then
-  row "Opus (sandboxed, opt-in)" "$OK" "claude + srt present"; opus_lane="live"
+if [ "$opus_pinned" = 0 ]; then
+  row "Opus (sandboxed, opt-in)" "$NO" "$opus_pin"; opus_lane="retired"
+elif have claude && have srt; then
+  row "Opus (sandboxed, opt-in)" "$OK" "claude + srt present; $opus_pin"; opus_lane="live"
 else
   need=""; have claude || need="claude"; have srt || need="${need:+$need and }srt"
   row "Opus (sandboxed, opt-in)" "$NO" "needs $need; in-session opus-reviewer agent still works"; opus_lane="retired"
@@ -179,6 +249,7 @@ else
   echo "$lanes of 2 no-cost review lanes live, Opus opt-in lane $opus_lane; $ok checks ok, $req_missing REQUIRED unmet, $opt_missing optional unmet."
   echo "Fix the required checks (SETUP.md, Required: Claude Code); optional ones only retire lanes."
 fi
-echo "Role-to-model bindings: ROSTER.md (Agent-tool rows and review lanes verified above; main-loop and built-in rows stay prose)."
+echo "Models and efforts: roster.conf (agent frontmatter and lane pins verified above)."
+echo "Edit roster.conf, run bin/roster-render, rerun this. ROSTER.md explains the roles."
 echo
 [ "$req_missing" -eq 0 ]
