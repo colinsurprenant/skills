@@ -47,7 +47,11 @@ Two standing rules while this skill is active:
 
 1. Resolve ALL ambiguity with the user now. Build agents run headless and cannot
    ask questions; anything left unresolved becomes a guess baked into code.
-2. Delegate codebase exploration to Explore agents.
+2. Delegate codebase exploration to Explore agents. Their model override comes
+   from the roster, not from a guess: run
+   `"$(dirname "$(readlink -f ~/.claude/skills/opus-build)")/bin/roster-get SCOUT_MODEL"`
+   and pass what it returns as the Agent tool's `model` override on every scout
+   you dispatch.
 3. Write one work order per independent workstream. A work order is self-contained:
    - **Goal** — what to build and why (one sentence of intent).
    - **Scope** — files/modules to touch; what is explicitly out of scope.
@@ -155,11 +159,13 @@ available at all, say so and either offer the in-session `opus-reviewer` agent
   billing).
   Frame it explicitly as review-only — "report findings; do not modify files" —
   the rescue agent is fix-capable and will edit if not told otherwise.
-  Model pin — MUST: read `CODEX_MODEL` and `CODEX_EFFORT` from
-  `"$(dirname "$(readlink -f ~/.claude/skills/opus-build)")/roster.conf"` (same
-  resolution idiom as `bin/doctor` above) and include
-  `--model <CODEX_MODEL> --effort <CODEX_EFFORT>` in the `/codex:rescue`
-  request text, so the rescue agent forwards them to the runtime. Verified in
+  Model pin — MUST: get `CODEX_MODEL` and `CODEX_EFFORT` through the one
+  reader, never by reading `roster.conf` yourself — run
+  `"$(dirname "$(readlink -f ~/.claude/skills/opus-build)")/bin/roster-get CODEX_MODEL"`
+  and the same for `CODEX_EFFORT` (same resolution idiom as `bin/doctor`
+  above) — then include `--model <value> --effort <value>`, with the two values
+  it returned, in the `/codex:rescue` request text, so the rescue agent
+  forwards them to the runtime. Verified in
   the plugin's `agents/codex-rescue.md` and `commands/rescue.md`: an explicit
   `--model`/`--effort` is passed through verbatim to `codex-companion.mjs
   task`, and both are left unset otherwise — which is why this lane silently

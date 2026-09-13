@@ -38,6 +38,15 @@ esac
 
 die() { echo "bin/roster-render: $*" >&2; exit 78; }
 
+# The temp file lives in agents/ next to its target, so it exists only for the
+# moment between mktemp and the rename; the trap makes sure an interrupt in
+# that window leaves no .roster-render.* behind.
+cur_tmp=""
+cleanup() { [ -z "$cur_tmp" ] || rm -f "$cur_tmp"; cur_tmp=""; }
+trap cleanup EXIT
+trap 'cleanup; exit 130' INT
+trap 'cleanup; exit 143' TERM
+
 # bin/roster-get is the one reader of roster.conf: it validates the whole file,
 # rejects duplicate keys and empty values, and owns the error text, so this
 # script never parses the roster itself — it only maps roles to files. A failed
@@ -60,7 +69,7 @@ report() { # report <rel> <why> — an error, in whichever mode we are running
 render_one() { # render_one <agent> <model> <effort>
   local agent="$1" model="$2" effort="$3"
   local rel="agents/$agent.md" f="$repo/agents/$agent.md"
-  local close fm n_model n_effort cur_model cur_effort bad tmp
+  local close fm n_model n_effort cur_model cur_effort bad tmp mode
 
   [ -f "$f" ] || { report "$rel" "file missing"; return 78; }
   [ -r "$f" ] || { report "$rel" "not readable"; return 78; }
@@ -90,32 +99,43 @@ render_one() { # render_one <agent> <model> <effort>
 
   # n==1 is "inside the leading frontmatter": a later --- in the body only
   # bumps the counter past 1, so prose is never touched.
-  tmp="$(mktemp "${TMPDIR:-/tmp}/roster-render.XXXXXX")" \
-    || { report "$rel" "could not create a temp file (TMPDIR=${TMPDIR:-/tmp})"; return 78; }
+  # Same directory as the target, so the replacement below is a rename within
+  # one filesystem: a reader sees either the whole old file or the whole new
+  # one, never a half-written agent.
+  tmp="$(mktemp "$(dirname "$f")/.roster-render.XXXXXX")" \
+    || { report "$rel" "could not create a temp file in $(dirname "$rel")/"; return 78; }
+  cur_tmp="$tmp"
   if ! awk -v model="$model" -v effort="$effort" '
     /^---$/            { n++; print; next }
     n == 1 && /^model:/  { print "model: " model;   next }
     n == 1 && /^effort:/ { print "effort: " effort; next }
                        { print }
   ' "$f" > "$tmp"; then
-    rm -f "$tmp"; report "$rel" "render failed while writing the temp file"; return 78
+    cleanup; report "$rel" "render failed while writing the temp file"; return 78
   fi
   # A zero-byte render means something went wrong upstream of the write; the
   # source always has at least a frontmatter block, so it can never be right.
   if [ ! -s "$tmp" ]; then
-    rm -f "$tmp"; report "$rel" "rendered output was empty; refusing to write"; return 78
+    cleanup; report "$rel" "rendered output was empty; refusing to write"; return 78
+  fi
+  # mktemp creates the temp file 0600 and the rename carries that mode across,
+  # so put the target's own mode on it first — the mode copy is what keeps the
+  # agent files 644. (The ~/.claude/agents/*.md symlinks resolve by path, not
+  # by inode, so the new inode a rename installs leaves them valid.)
+  if [ "$(uname -s)" = Darwin ]; then mode="$(stat -f %Lp "$f" 2>/dev/null)"
+  else mode="$(stat -c %a "$f" 2>/dev/null)"; fi
+  if [ -z "$mode" ] || ! chmod "$mode" "$tmp"; then
+    cleanup; report "$rel" "could not copy the file's mode onto the temp file"; return 78
   fi
   if cmp -s "$f" "$tmp"; then
-    rm -f "$tmp"
+    cleanup
     printf 'unchanged %s\n' "$rel"
     return 0
   fi
-  # Rewrite in place, not mv: keeps the file's mode and inode, which the
-  # ~/.claude symlinks point at.
-  if ! cat "$tmp" > "$f"; then
-    rm -f "$tmp"; report "$rel" "write failed; the file may be partially written"; return 78
+  if ! mv -f "$tmp" "$f"; then
+    cleanup; report "$rel" "could not replace the file; it is unchanged"; return 78
   fi
-  rm -f "$tmp"
+  cur_tmp=""
   printf 'rendered %s (model=%s, effort=%s)\n' "$rel" "$model" "$effort"
 }
 
