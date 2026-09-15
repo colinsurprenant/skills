@@ -154,7 +154,8 @@ the one no external reviewer can do — only this session knows the intent.
   shape — goal, scope, constraints, acceptance criteria, verification, and a
   **Touches** bullet filled in like any other order — scoped to the findings it
   fixes and nothing else, so a correction carries the same contract as the build
-  it corrects. Resolve a builder-reported blocker on an editable out-of-scope
+  it corrects — including the step 4 gate when the fix itself changes protocol,
+  trust, or spec prose. Resolve a builder-reported blocker on an editable out-of-scope
   restatement before the work proceeds — a fix order that widens scope or
   amends the rule, never shipping the drift; frozen and snapshot hits stay
   report-only.
