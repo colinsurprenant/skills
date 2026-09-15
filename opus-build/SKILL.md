@@ -57,7 +57,34 @@ Two standing rules while this skill is active:
    - **Scope** — files/modules to touch; what is explicitly out of scope.
    - **Constraints** — contracts to preserve, existing patterns to follow (name the files).
    - **Acceptance criteria** — observable, checkable statements.
-   - **Verification** — exact test/build commands to run.
+   - **Verification** — exact test/build commands to run, or for a prose
+     deliverable the exact check that demonstrates each criterion (a grep, a
+     `--check` mode, a line to read).
+   - **Touches** — the rule, contract, or term this order changes, named so the
+     builder can find every restatement of it; the sweep itself is the builder's
+     standing behavior, so the order only has to name the thing. `none` is a
+     legal value for an order that changes no rule, contract, or term, and the
+     builder's sweep then does not fire.
+4. When the work is protocol-, trust-, or spec-to-prose-shaped — rules naming who
+   may do what, text that other documents must agree with, prose another party
+   will execute — dispatch the `researcher` agent with the finished order and have
+   it attack the ORDER, not the code: what would this let a builder get wrong,
+   which rule keys on an input a peer supplies, which sibling documents drift when
+   this lands. Dispatch it as a Validate order whose claim is "a builder
+   executing this order as written produces what the user wants", and give it
+   the user's original request and the step 1 decisions alongside the order —
+   the order alone cannot reveal a requirement it dropped — so what comes back
+   is that claim's verdict plus the defect list that supports it. Fold the
+   findings into the order; a finding that needs a user decision reopens step 1
+   before you dispatch. Code-shaped orders whose tests are the check skip this
+   gate — the test run is their adversarial pass. That exemption applies only to
+   orders that are code all the way through: if any part of the order is
+   protocol-, trust-, or spec-to-prose-shaped, the gate is on, even when the
+   rest is tested code. In a repo whose deliverables are prose the gate is on
+   for most orders, and that is intended, not a misfire. Rationale: on the
+   parley M5 run three of the four big design findings were findable from the
+   order before any builder ran, and cost nine review passes to surface
+   afterward.
 
 Two scoping contracts, downward and upward. Downward: an order carries
 exactly what its task's inputs require — padding it with everything the
@@ -123,7 +150,15 @@ the one no external reviewer can do — only this session knows the intent.
 
 - Trivial fix (typo-grade): fix inline.
 - Anything more: write a narrow fix order and redispatch to Opus. Don't absorb
-  build work back into this main loop.
+  build work back into this main loop. A fix order is the Phase 1 work-order
+  shape — goal, scope, constraints, acceptance criteria, verification, and a
+  **Touches** bullet filled in like any other order — scoped to the findings it
+  fixes and nothing else, so a correction carries the same contract as the build
+  it corrects — including the step 4 gate when the fix itself changes protocol,
+  trust, or spec prose. Resolve a builder-reported blocker on an editable out-of-scope
+  restatement before the work proceeds — a fix order that widens scope or
+  amends the rule, never shipping the drift; frozen and snapshot hits stay
+  report-only.
 - Large diff (several hundred lines or more): don't pull it all into this
   context — dispatch an Opus agent to produce a criteria-by-criteria
   verification report and review that instead.
@@ -131,6 +166,22 @@ the one no external reviewer can do — only this session knows the intent.
 ## Phase 4 — Breadth review (external reviewers)
 
 Once the diff passes Phase 3, run independent fresh-eyes passes in parallel.
+
+The first act of this phase is committing the Phase-3-approved tree, or naming
+the existing head if that tree is already committed; the roster announcement
+comes right after and names that SHA. It also names the base that head is
+reviewed against — the merge base with the PR's target branch (the integration
+branch the work will merge into) on the breadth pass, and the immediately
+preceding reviewed head on a confirming pass, never the original breadth head,
+or reviewers see two fix cycles at once and the one-commit-per-round rule is
+defeated — and every lane request carries both, so no lane guesses between one
+commit's patch and the whole branch. Every installed no-cost lane runs once on
+the breadth-pass head (the opt-in Opus lane only if the user opted in), a
+confirming pass runs the lane set Phase 5 names, and no fixes land between
+lanes: serial fix-then-re-review lets each pass find what the previous fix
+introduced, and a lane running at light effort re-raises what an earlier pass
+already fixed.
+
 Stakes scale whether this phase runs and whether to escalate to /code-review —
 not the no-cost roster: when the phase runs, every no-cost lane that is
 INSTALLED runs, since none of them costs Anthropic tokens.
@@ -147,16 +198,16 @@ veto — but only as a VERIFIED fact, never an assumption. Before calling a lane
 absent, run the check in THIS session (doctor as above, or that lane's own
 `command -v` / plugin lookup) and name the check you ran. An unverified "not installed" is exactly the silent
 scaling this rule exists to prevent, wearing a more respectable hat. What
-still needs saying out loud: announce the roster in plain text on entering
-this phase, and name any lane you skipped along with which kind of skip it
+still needs saying out loud: announce the roster in plain text right after that
+commit, and name any lane you skipped along with which kind of skip it
 was — "not installed" and "installed but the harness is down" are different
 facts and the user should get the right one. Dropping an INSTALLED no-cost reviewer remains a
 judgment call the user gets to veto, not silent scaling. If no external lane is
 available at all, say so and either offer the in-session `opus-reviewer` agent
 (Anthropic-billed, so ask first) or skip the phase.
 
-- **Codex**: `/codex:rescue` with a review request on the diff (ChatGPT plan
-  billing).
+- **Codex**: `/codex:rescue` with a review request naming the Phase 4 base and
+  head (ChatGPT plan billing).
   Frame it explicitly as review-only — "report findings; do not modify files" —
   the rescue agent is fix-capable and will edit if not told otherwise.
   Model pin — MUST: get `CODEX_MODEL` and `CODEX_EFFORT` through the one
@@ -188,8 +239,8 @@ available at all, say so and either offer the in-session `opus-reviewer` agent
   the sandbox defaults; a change there is a roster-level change to surface to
   the user, not silently absorb.
 - **Kimi K3 (via OpenCode)**: invoke through the sandbox wrapper bundled with
-  this skill — `~/.claude/skills/opus-build/sandbox/k3-review.sh "<review
-  prompt naming the diff/branch>"` — via Bash with `run_in_background` (or a
+  this skill — `~/.claude/skills/opus-build/sandbox/k3-review.sh "<review prompt
+  naming the Phase 4 base and head>"` — via Bash with `run_in_background` (or a
   long explicit timeout): a real review run exceeds the default Bash timeout.
   The wrapper pins the model (and the optional `--variant` reasoning effort)
   from `roster.conf` at the repo root, and runs `opencode run` under srt
@@ -213,9 +264,9 @@ available at all, say so and either offer the in-session `opus-reviewer` agent
 - **Opus (OPT-IN — costs Anthropic tokens)**: invoke through the sandbox
   wrapper bundled with this skill —
   `~/.claude/skills/opus-build/sandbox/opus-review.sh "<review prompt naming
-  the diff/branch>"` — via Bash with `run_in_background` (or a long explicit
-  timeout): a real review run exceeds the default Bash timeout. The wrapper
-  runs headless `claude -p` under srt, pinned to the model and effort in
+  the Phase 4 base and head>"` — via Bash with `run_in_background` (or a long
+  explicit timeout): a real review run exceeds the default Bash timeout. The
+  wrapper runs headless `claude -p` under srt, pinned to the model and effort in
   `roster.conf` at the repo root, read-only at two layers (tool allowlist + OS
   boundary),
   with all MCP disabled and the same two-layer Director kill as the K3 lane.
@@ -244,8 +295,33 @@ forbids, one grain coarser.
 
 ## Phase 5 — Triage and close (here, on the main loop)
 
-Adjudicate external findings (expect noise), dispatch real fixes to Opus, then
+Adjudicate every lane's findings together (expect noise), dispatch the accepted
+fixes to Opus as one cycle — one fix order, or a few that don't overlap — then
 summarize: what shipped, who reviewed what, which findings were rejected and why.
+
+That cycle runs once, not as a loop. When the fixes land, commit the fix tree
+and announce the base — the preceding reviewed head — and the new head, then run
+ONE confirming pass before you summarize: only the lanes whose findings were
+accepted, rerun on that commit, each request carrying that lane's accepted
+findings and asking for a fixed / still-open verdict on every one, since a
+fresh reviewer given only base and head cannot certify a closure or tell a
+regression from an unrelated new issue. Findings that are both new and not
+regressions go into the Phase 5 summary as deferred follow-ups rather than a
+second cycle,
+unless the user says otherwise — except blocking ones, a security or correctness
+defect that would not ship as a follow-up, which join the extra cycle below;
+newness alone does not make a finding safe to defer.
+A finding already rejected in triage and re-raised by the confirming pass is
+re-rejected without a new cycle and counted in the summary's rejected tally. A
+regression of a fix earns one more cycle, and an accepted finding the confirming
+pass shows still open is handled exactly the same way, never deferred as a
+follow-up. That extra cycle gets its own confirming pass by the same Phase 5
+lane set, the lanes whose findings were accepted; if that second confirming pass
+shows any regression, any still-open accepted finding, or any blocking finding
+under the deferral rule above — not only the original one — the order was wrong
+and the work goes back to Phase 1. Batching this way also yields one clean
+sample per lane per commit, instead of counts smeared across passes that
+reviewed different trees.
 
 Then capture the run's tallies to the combo log, always: one
 `director emit --type note --area combo-log` with, per lane, submitted /

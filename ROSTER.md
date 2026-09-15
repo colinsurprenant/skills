@@ -96,7 +96,15 @@ singleton outcome (a bounced work order, a researcher spot-check result):
 
 Record facts (counts and one-line reasons), never derived metrics; metrics
 are recomputed at analysis time from the raw notes, so the record shape can
-stay stable while the questions change.
+stay stable while the questions change. Per-lane counts cover the Phase 4
+breadth pass only, so they describe one tree per lane; the note as a whole may
+span a confirming head. The Phase 5 confirming pass does not increment those
+counts: it increments `fix_cycles` instead, once per fix cycle actually run and
+not per finding — a regression, a still-open accepted finding, or a blocking
+new finding can each call for a cycle, several found on one pass batch into
+one, and a return to Phase 1 is a restart, not a cycle (Phase 3 fixes count
+there too, so the value is not fixed), while a deferred follow-up goes in
+`note=`.
 
 ## Swap procedure
 
