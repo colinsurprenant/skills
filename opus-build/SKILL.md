@@ -302,8 +302,12 @@ summarize: what shipped, who reviewed what, which findings were rejected and why
 That cycle runs once, not as a loop. When the fixes land, commit the fix tree
 and announce the base — the preceding reviewed head — and the new head, then run
 ONE confirming pass before you summarize: only the lanes whose findings were
-accepted, rerun on that commit. Findings that are both new and not regressions
-go into the Phase 5 summary as deferred follow-ups rather than a second cycle,
+accepted, rerun on that commit, each request carrying that lane's accepted
+findings and asking for a fixed / still-open verdict on every one, since a
+fresh reviewer given only base and head cannot certify a closure or tell a
+regression from an unrelated new issue. Findings that are both new and not
+regressions go into the Phase 5 summary as deferred follow-ups rather than a
+second cycle,
 unless the user says otherwise — except blocking ones, a security or correctness
 defect that would not ship as a follow-up, which join the extra cycle below;
 newness alone does not make a finding safe to defer.
