@@ -161,15 +161,19 @@ the one no external reviewer can do — only this session knows the intent.
 
 Once the diff passes Phase 3, run independent fresh-eyes passes in parallel.
 
-The first act of this phase is committing the Phase-3-approved tree; the roster
-announcement comes right after and names that SHA. It also names the base that
-head is reviewed against — the merge base with `main`, or the previous Phase 4
-commit on a confirming pass — and every lane request carries both, so no lane
-guesses between one commit's patch and the whole branch. Every installed
-no-cost lane then runs once on that commit (the opt-in Opus lane only if the
-user opted in), and no fixes land between lanes: serial fix-then-re-review lets
-each pass find what the previous fix introduced, and a lane running at light
-effort re-raises what an earlier pass already fixed.
+The first act of this phase is committing the Phase-3-approved tree, or naming
+the existing head if that tree is already committed; the roster announcement
+comes right after and names that SHA. It also names the base that head is
+reviewed against — the merge base with `main` on the breadth pass, and the
+immediately preceding reviewed head on a confirming pass, never the original
+breadth head, or reviewers see two fix cycles at once and the
+one-commit-per-round rule is defeated — and every lane request carries both, so
+no lane guesses between one commit's patch and the whole branch. Every
+installed no-cost lane runs once on the breadth-pass head (the opt-in Opus lane
+only if the user opted in), a confirming pass runs the lane set Phase 5 names,
+and no fixes land between lanes: serial fix-then-re-review lets each pass find
+what the previous fix introduced, and a lane running at light effort re-raises
+what an earlier pass already fixed.
 
 Stakes scale whether this phase runs and whether to escalate to /code-review —
 not the no-cost roster: when the phase runs, every no-cost lane that is
@@ -288,17 +292,24 @@ Adjudicate every lane's findings together (expect noise), dispatch the accepted
 fixes to Opus as one cycle — one fix order, or a few that don't overlap — then
 summarize: what shipped, who reviewed what, which findings were rejected and why.
 
-That cycle runs once, not as a loop. When the fixes land, run ONE confirming
-pass before you summarize — only the lanes whose findings were accepted, on the
-new commit. Only findings that are both new and not regressions defer: those go
-into the Phase 5 summary as follow-ups rather than a second cycle, unless the
-user says otherwise. A regression of a fix earns one more cycle, and an accepted
-finding the confirming pass shows still open is handled exactly the same way,
-never deferred as a follow-up. That extra cycle gets its own confirming pass by
-the same lanes; if that second confirming pass still shows the regression or the
-open finding, the order was wrong and the work goes back to Phase 1. Batching
-this way also yields one clean sample per lane per commit, instead of counts
-smeared across passes that reviewed different trees.
+That cycle runs once, not as a loop. When the fixes land, commit the fix tree
+and announce the base — the preceding reviewed head — and the new head, then run
+ONE confirming pass before you summarize: only the lanes whose findings were
+accepted, rerun on that commit. Findings that are both new and not regressions
+go into the Phase 5 summary as deferred follow-ups rather than a second cycle,
+unless the user says otherwise — except blocking ones, a security or correctness
+defect that would not ship as a follow-up, which join the extra cycle below;
+newness alone does not make a finding safe to defer.
+A finding already rejected in triage and re-raised by the confirming pass is
+re-rejected without a new cycle and counted in the summary's rejected tally. A
+regression of a fix earns one more cycle, and an accepted finding the confirming
+pass shows still open is handled exactly the same way, never deferred as a
+follow-up. That extra cycle gets its own confirming pass by the same Phase 5
+lane set, the lanes whose findings were accepted; if that second confirming pass
+shows any regression or any still-open accepted finding, not only the original
+one, the order was wrong and the work goes back to Phase 1. Batching this way
+also yields one clean sample per lane per commit, instead of counts smeared
+across passes that reviewed different trees.
 
 Then capture the run's tallies to the combo log, always: one
 `director emit --type note --area combo-log` with, per lane, submitted /
