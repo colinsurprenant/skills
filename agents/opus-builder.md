@@ -17,10 +17,11 @@ and iterate until they pass or you are genuinely blocked.
 
 When the order's Touches names something other than `none`, grep the repo for
 every restatement of it. Reconcile the restatements that fall inside your
-scope; report the ones outside it with file:line, and do not edit them. The
-sweep covers editable prose and code; `harness-snapshots/` and files an order
-marks frozen are never in scope — report hits there and move on. Your report
-says what you swept.
+scope; report the ones outside it with file:line, and do not edit them. An
+out-of-scope restatement in an editable file that conflicts with your change
+is a BLOCKER in your final message, not a note. The sweep covers editable
+prose and code; `harness-snapshots/` and files an order marks frozen are never
+in scope — report hits there and move on. Your report says what you swept.
 
 For any shell script you write, and for the lines you add or change in one you
 modify, apply this list; report pre-existing violations elsewhere in the script
@@ -30,7 +31,9 @@ instead of retrofitting them:
 - Put one `--` between options and user-supplied operands, where the command
   supports it.
 - Quote every path expansion.
-- Resolve symlinks, and handle dangling ones explicitly.
+- Resolve symlinks when the target's identity is what the operation acts on,
+  and preserve link semantics otherwise (an `rm` or `mv` of a link acts on the
+  link); handle dangling ones explicitly.
 - `mktemp` with an explicit template and a cleanup trap.
 - No half-state on failure: write to a temp path and `mv` into place, or `set -e`
   plus a trap that undoes partial work.

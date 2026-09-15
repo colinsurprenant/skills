@@ -152,7 +152,10 @@ the one no external reviewer can do — only this session knows the intent.
   shape — goal, scope, constraints, acceptance criteria, verification, and a
   **Touches** bullet filled in like any other order — scoped to the findings it
   fixes and nothing else, so a correction carries the same contract as the build
-  it corrects.
+  it corrects. Resolve a builder-reported blocker on an editable out-of-scope
+  restatement before the work proceeds — a fix order that widens scope or
+  amends the rule, never shipping the drift; frozen and snapshot hits stay
+  report-only.
 - Large diff (several hundred lines or more): don't pull it all into this
   context — dispatch an Opus agent to produce a criteria-by-criteria
   verification report and review that instead.
@@ -164,16 +167,17 @@ Once the diff passes Phase 3, run independent fresh-eyes passes in parallel.
 The first act of this phase is committing the Phase-3-approved tree, or naming
 the existing head if that tree is already committed; the roster announcement
 comes right after and names that SHA. It also names the base that head is
-reviewed against — the merge base with `main` on the breadth pass, and the
-immediately preceding reviewed head on a confirming pass, never the original
-breadth head, or reviewers see two fix cycles at once and the
-one-commit-per-round rule is defeated — and every lane request carries both, so
-no lane guesses between one commit's patch and the whole branch. Every
-installed no-cost lane runs once on the breadth-pass head (the opt-in Opus lane
-only if the user opted in), a confirming pass runs the lane set Phase 5 names,
-and no fixes land between lanes: serial fix-then-re-review lets each pass find
-what the previous fix introduced, and a lane running at light effort re-raises
-what an earlier pass already fixed.
+reviewed against — the merge base with the PR's target branch (the integration
+branch the work will merge into) on the breadth pass, and the immediately
+preceding reviewed head on a confirming pass, never the original breadth head,
+or reviewers see two fix cycles at once and the one-commit-per-round rule is
+defeated — and every lane request carries both, so no lane guesses between one
+commit's patch and the whole branch. Every installed no-cost lane runs once on
+the breadth-pass head (the opt-in Opus lane only if the user opted in), a
+confirming pass runs the lane set Phase 5 names, and no fixes land between
+lanes: serial fix-then-re-review lets each pass find what the previous fix
+introduced, and a lane running at light effort re-raises what an earlier pass
+already fixed.
 
 Stakes scale whether this phase runs and whether to escalate to /code-review —
 not the no-cost roster: when the phase runs, every no-cost lane that is
@@ -306,10 +310,11 @@ regression of a fix earns one more cycle, and an accepted finding the confirming
 pass shows still open is handled exactly the same way, never deferred as a
 follow-up. That extra cycle gets its own confirming pass by the same Phase 5
 lane set, the lanes whose findings were accepted; if that second confirming pass
-shows any regression or any still-open accepted finding, not only the original
-one, the order was wrong and the work goes back to Phase 1. Batching this way
-also yields one clean sample per lane per commit, instead of counts smeared
-across passes that reviewed different trees.
+shows any regression, any still-open accepted finding, or any blocking finding
+under the deferral rule above — not only the original one — the order was wrong
+and the work goes back to Phase 1. Batching this way also yields one clean
+sample per lane per commit, instead of counts smeared across passes that
+reviewed different trees.
 
 Then capture the run's tallies to the combo log, always: one
 `director emit --type note --area combo-log` with, per lane, submitted /
