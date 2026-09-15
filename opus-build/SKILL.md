@@ -71,8 +71,10 @@ Two standing rules while this skill is active:
    it attack the ORDER, not the code: what would this let a builder get wrong,
    which rule keys on an input a peer supplies, which sibling documents drift when
    this lands. Dispatch it as a Validate order whose claim is "a builder
-   executing this order as written produces what the user wants", so what comes
-   back is that claim's verdict plus the defect list that supports it. Fold the
+   executing this order as written produces what the user wants", and give it
+   the user's original request and the step 1 decisions alongside the order —
+   the order alone cannot reveal a requirement it dropped — so what comes back
+   is that claim's verdict plus the defect list that supports it. Fold the
    findings into the order; a finding that needs a user decision reopens step 1
    before you dispatch. Code-shaped orders whose tests are the check skip this
    gate — the test run is their adversarial pass. That exemption applies only to

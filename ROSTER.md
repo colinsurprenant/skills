@@ -101,9 +101,10 @@ breadth pass only, so they describe one tree per lane; the note as a whole may
 span a confirming head. The Phase 5 confirming pass does not increment those
 counts: it increments `fix_cycles` instead, once per fix cycle actually run and
 not per finding — a regression, a still-open accepted finding, or a blocking
-new finding each triggers a cycle, and several found on one pass batch into one
-(Phase 3 fixes count there too, so the value is not fixed), while a deferred
-follow-up goes in `note=`.
+new finding can each call for a cycle, several found on one pass batch into
+one, and a return to Phase 1 is a restart, not a cycle (Phase 3 fixes count
+there too, so the value is not fixed), while a deferred follow-up goes in
+`note=`.
 
 ## Swap procedure
 
