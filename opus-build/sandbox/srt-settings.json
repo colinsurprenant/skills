@@ -1,6 +1,8 @@
 {
   "filesystem": {
-    "denyRead": ["~/.ssh"],
+    "denyRead": [
+      "~/.ssh"
+    ],
     "allowWrite": [
       "~/.local/share/opencode",
       "~/.local/state/opencode",
@@ -9,10 +11,16 @@
       "/private/tmp",
       "/private/var/folders"
     ],
-    "denyWrite": ["~/.director"]
+    "denyWrite": [
+      "~/.director"
+    ]
   },
   "network": {
-    "allowedDomains": ["api.kimi.com", "models.dev", "models.opencode.ai"],
+    "allowedDomains": [
+      "api.kimi.ai",
+      "models.dev",
+      "models.opencode.ai"
+    ],
     "deniedDomains": []
   }
 }
