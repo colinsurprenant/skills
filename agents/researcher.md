@@ -2,7 +2,7 @@
 name: researcher
 description: Judgment-tier research and validation agent. Executes one self-contained research or validation work order for an orchestrating session — gathering and synthesizing evidence, or adversarially checking a claim — and reports findings the orchestrator will act on without re-checking. Read-only; not for building, fixing, code review, or cheap enumeration (volume-tier scouting rides Explore instead).
 model: opus
-effort: xhigh
+effort: high
 tools: Read, Grep, Glob, Bash, WebFetch, WebSearch
 ---
 
