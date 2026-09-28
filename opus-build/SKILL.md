@@ -1,6 +1,6 @@
 ---
 name: opus-build
-description: Split build workflow for Fable or Opus sessions — plan and review on the main loop, implement on fresh Opus subagents at xhigh effort. Use when this session runs on Fable or Opus and is about to implement a feature, fix, or refactor of substance — multiple files, new code paths, or a change that needs a test cycle — even if the user doesn't mention budget, Opus, or delegation. On a Fable main loop it is a budget split; on an Opus main loop it is a context split. Not for single-file changes of a few lines, pure Q&A, investigation-only tasks, or sessions on any other model.
+description: Split build workflow for Fable or Opus sessions — plan and review on the main loop, implement on fresh Opus subagents at the roster's pinned effort. Use when this session runs on Fable or Opus and is about to implement a feature, fix, or refactor of substance — multiple files, new code paths, or a change that needs a test cycle — even if the user doesn't mention budget, Opus, or delegation. On a Fable main loop it is a budget split; on an Opus main loop it is a context split. Not for single-file changes of a few lines, pure Q&A, investigation-only tasks, or sessions on any other model.
 ---
 
 # opus-build — plan here, build on Opus, review here
@@ -133,10 +133,11 @@ Serialize orders that would touch the same files: if two orders conflict, they
 weren't independent workstreams, and worktree isolation would only defer the
 merge conflict to a step nobody owns.
 
-Effort policy: builders always run at `BUILDER_EFFORT` from `roster.conf`, which
-is set to the effort Anthropic's model guidance names best for coding and
-agentic work (xhigh at the time of writing) — deeper thinking on the first pass
-is cheaper than a redispatch loop mediated by this main loop. On a Fable main
+Effort policy: builders always run at `BUILDER_EFFORT` from `roster.conf`
+(high since 2026-09-27, lowered from xhigh with the move to Opus 5.5; the one
+measured medium-versus-xhigh Opus solo pair, M8 in the parley project, found
+xhigh 2.3x the cost for no probe gain) — a fixed pin on the first pass is
+cheaper than a redispatch loop mediated by this main loop. On a Fable main
 loop there is a second reason: Opus is the cheap half of the pool. The agent
 definition enforces this and its frontmatter is rendered from `roster.conf`, so
 the policy has exactly one place to change; don't override it downward per
