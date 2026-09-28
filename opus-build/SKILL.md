@@ -64,6 +64,7 @@ Granularity. A work order is a coherent slice a solo session would finish in
 15 to 30 minutes, never a step. Two or three dispatches per session is the
 norm; needing more means the cut is wrong or the task should have stayed
 inline. Anything a solo session finishes in under 10 minutes, do here.
+Narrow fix orders (Phases 3 and 5) are exempt from the 15-minute floor.
 Independent orders may run concurrently. Why: each builder pays a fixed
 orientation cost (~1.4 USD measured in M8) and each dispatch costs this loop
 4 to 13 messages of coordination.
@@ -118,7 +119,10 @@ scope creep, missed criteria, suspicious test output; only this session knows
 the intent. Review by report: read the builder's hand-back and make targeted
 reads of the lines it names, never the whole diff (measured in M8 to hold).
 
-- A review fix a solo pass finishes in under 10 minutes: do it here, inline.
+- A review fix a solo pass finishes in under 10 minutes: do it here, inline,
+  under the same obligations an order would carry: the step 4 gate when it
+  changes protocol, trust, or spec prose; the restatement sweep; and the
+  verification the order would have named.
 - Anything larger: a narrow fix order to Opus; don't absorb build work here. A
   fix order has the full Phase 1 shape, **Touches** included, scoped to the
   findings it fixes, and takes the step 4 gate when the fix changes protocol,
