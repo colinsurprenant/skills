@@ -96,6 +96,10 @@ BUCKETS = ("Agent", "Bash", "Read", "Grep/Glob", "Skill", "other",
 PHASE_ORDER = ("plan", "build", "builder-review", "lane", "triage",
                "director", "commit")
 ONE_SHOT = ("director", "commit")
+# A director call in a turn whose own output is above this many tokens rode
+# along on thinking the session would have done anyway; the turn keeps its
+# surrounding phase and is counted under "ride_along" instead.
+DIRECTOR_RIDE_ALONG_OUT = 3000
 DISPATCH_TOOLS = ("Agent", "Task", "Workflow")
 MARKER_PHASE = {"1": "plan", "2": "build", "3": "builder-review",
                 "4": "lane", "5": "triage"}
@@ -706,7 +710,10 @@ def message_signals(msg, in_plan):
         elif command and any(GIT_COMMIT.search(s) for s in bash_segments(command)):
             found.append((5, "commit", "git commit/push"))
         elif command and any(s.startswith("director ") for s in bash_segments(command)):
-            found.append((5, "director", "director command"))
+            if tok(msg["usage"], "output_tokens") > DIRECTOR_RIDE_ALONG_OUT:
+                msg["ride_along"] = True
+            else:
+                found.append((5, "director", "director command"))
     return found, watch
 
 
@@ -720,7 +727,9 @@ def classify(messages, consumed_at):
     4 a lane launch (codex, opus-reviewer, a review wrapper), then consuming a
     lane's result, which opens triage; 5 commit, then director. Before any
     boundary the phase is plan. commit and director are one-shot: they label
-    their own message only, and the phase before them carries on.
+    their own message only, and the phase before them carries on. A director
+    call inside a turn with more than DIRECTOR_RIDE_ALONG_OUT output tokens is
+    a ride-along, not a boundary: the turn was going to happen without it.
     """
     phase, watching = "plan", {}
     for idx, msg in enumerate(messages):
@@ -905,6 +914,7 @@ def phases_data(main_path, top):
         "unpriced": [m for m, r in by_model.items() if not r["priced"]],
         "admitted": sum(m["admitted"] for m in messages),
         "phases": phase_rows(messages),
+        "ride_along": sum(1 for m in messages if m.get("ride_along")),
         "work_orders": work_order_rows(messages, tools, agent_meta, consumed_at),
         "top_admissions": top_admissions(messages, tools, top),
         "one_hour": OrderedDict(
@@ -919,7 +929,7 @@ def phases_data(main_path, top):
 
 
 def print_phases(data):
-    short = ("Agent", "Bash", "Read", "Grep/Glob", "Skill", "other", "asst-out",
+    short = ("Agent", "Bash", "Read", "Grep/Glob", "Skill", "other", "prev-out",
              "rebuild")
     print("%-15s %5s %9s %9s  " % ("phase", "msgs", "USD", "admitted")
           + " ".join("%9s" % s for s in short))
@@ -953,6 +963,11 @@ def print_phases(data):
         print("%6d  %-12s %-6s %-15s %s" % (item["chars"], item["kind"],
                                            item["tool"], item["phase"],
                                            item["input"]))
+    if data["ride_along"]:
+        print()
+        print("note: %d director call(s) rode along on a turn with more than %d"
+              " output tokens; those turns keep their surrounding phase"
+              % (data["ride_along"], DIRECTOR_RIDE_ALONG_OUT))
     if data["one_hour"]:
         print()
         print_ttl_notes(data["one_hour"])
