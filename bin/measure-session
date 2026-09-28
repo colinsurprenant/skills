@@ -34,6 +34,9 @@ phases: main loop only.
   - Phase of each assistant message: the most recent boundary (see classify()).
     "director" and "commit" are one-shot: they label only the message that
     runs the command, and the next message returns to the phase before it.
+    A director call in a turn with more than DIRECTOR_RIDE_ALONG_OUT tokens
+    of thinking is a ride-along: the turn keeps its surrounding phase and
+    is counted in "ride_along" (also per message in the timeline).
   - Admitted tokens: a message's cache_creation_input_tokens is what that turn
     newly wrote to cache. It is split in three. When cache_read falls short of
     the previous message's cache_read + cache_creation (TTL expiry, model
@@ -671,7 +674,7 @@ def message_signals(msg, in_plan):
     """Candidate (priority, phase, reason) boundaries opened by this message's
     own blocks, plus the tool ids whose consumption opens a later phase. Plan
     signals count only while the session is still in plan."""
-    found, watch = [], {}
+    found, watch, ride = [], {}, False
     for block in msg["blocks"]:
         if block.get("type") == "text":
             phase = marker_phase(block.get("text", ""))
@@ -710,11 +713,19 @@ def message_signals(msg, in_plan):
         elif command and any(GIT_COMMIT.search(s) for s in bash_segments(command)):
             found.append((5, "commit", "git commit/push"))
         elif command and any(s.startswith("director ") for s in bash_segments(command)):
-            if tok(msg["usage"], "output_tokens") > DIRECTOR_RIDE_ALONG_OUT:
-                msg["ride_along"] = True
+            if thinking_output(msg) > DIRECTOR_RIDE_ALONG_OUT:
+                ride = True
             else:
                 found.append((5, "director", "director command"))
-    return found, watch
+    return found, watch, ride
+
+
+def thinking_output(msg):
+    """Output tokens net of the tool_use inputs, which output_tokens counts:
+    a long emit body alone must not read as a thinking turn (4 chars/token)."""
+    inputs = sum(len(json.dumps(b.get("input", {}), separators=(",", ":")))
+                 for b in msg["blocks"] if b.get("type") == "tool_use")
+    return tok(msg["usage"], "output_tokens") - inputs // 4
 
 
 def classify(messages, consumed_at):
@@ -733,12 +744,14 @@ def classify(messages, consumed_at):
     """
     phase, watching = "plan", {}
     for idx, msg in enumerate(messages):
-        found, watch = message_signals(msg, phase == "plan")
+        found, watch, ride = message_signals(msg, phase == "plan")
         for tid, opens in watching.items():
             if consumed_at.get(tid) == idx:
                 rank = 2.5 if opens == "builder-review" else 4.5
                 found.append((rank, opens, "result consumed"))
         watching.update(watch)
+        if ride and not found:
+            msg["ride_along"] = True
         label = phase
         if found:
             _, label, reason = min(found, key=lambda f: f[0])
@@ -923,6 +936,7 @@ def phases_data(main_path, top):
             for m, r in by_model.items() if r["cache_write_1h"]),
         "timeline": [{"id": m["id"], "phase": m["phase"],
                       "boundary": m.get("reason"), "usd": m["usd"],
+                      "ride_along": m.get("ride_along", False),
                       "admitted": m["admitted"],
                       "split": lr_round(m["split"], m["admitted"])}
                      for m in messages]}
@@ -965,8 +979,8 @@ def print_phases(data):
                                            item["input"]))
     if data["ride_along"]:
         print()
-        print("note: %d director call(s) rode along on a turn with more than %d"
-              " output tokens; those turns keep their surrounding phase"
+        print("note: %d director call(s) rode along on a turn with more than %d tokens of"
+              " thinking; those turns keep their surrounding phase"
               % (data["ride_along"], DIRECTOR_RIDE_ALONG_OUT))
     if data["one_hour"]:
         print()
@@ -985,7 +999,12 @@ def selftest():
                 "input": {"subagent_type": "opus-builder"}}),
            msg(bash("director emit --type note")), msg(bash("git commit -F m")),
            msg({"type": "tool_use", "name": "Agent", "input": {
-               "subagent_type": "Explore"}}), msg(bash("cat /tmp/k3-review-x1"))]
+               "subagent_type": "Explore"}}), msg(bash("cat /tmp/k3-review-x1")),
+           msg(bash("director emit --type note"), out=5000),
+           msg({"type": "tool_use", "name": "Agent", "id": "c",
+                "input": {"subagent_type": "opus-builder"}},
+               bash("director emit --type note"), out=5000),
+           msg(bash("director emit --type note " + "x" * 12000), out=3200)]
     classify(seq, {})
     reb = [msg(cached=0, written=1000, out=50),
            msg(cached=200, written=900, inputs=[{"chars": 3, "bucket": "Bash"}])]
@@ -1000,7 +1019,10 @@ def selftest():
         "lane launch": lane_launch("cd r; ~/s/k3-review.sh 'p; q'", {}),
         "report read": not lane_launch("cat /tmp/k3-review-abc", {}),
         "one-shot": [m["phase"] for m in seq] ==
-        ["build", "director", "commit", "build", "build"],
+        ["build", "director", "commit", "build", "build", "build", "build",
+         "director"],
+        "ride-along": [m.get("ride_along", False) for m in seq] ==
+        [False] * 5 + [True, False, False],
         "rebuild": reb[1]["split"]["cache-rebuild"] == 800 and
         reb[1]["split"]["assistant-output"] == 50,
     }
