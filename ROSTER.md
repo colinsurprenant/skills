@@ -102,9 +102,9 @@ span a confirming head. The Phase 5 confirming pass does not increment those
 counts: it increments `fix_cycles` instead, once per fix cycle actually run and
 not per finding — a regression, a still-open accepted finding, or a blocking
 new finding can each call for a cycle, several found on one pass batch into
-one, and a return to Phase 1 is a restart, not a cycle (Phase 3 fixes count
-there too, so the value is not fixed), while a deferred follow-up goes in
-`note=`.
+one, and the fix order that follows the confirming pass (reviewed in Phase 3,
+no further lane round) is the second and last cycle, while a deferred
+follow-up goes in `note=`.
 
 ## Swap procedure
 
