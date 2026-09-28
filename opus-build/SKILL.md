@@ -1,6 +1,6 @@
 ---
 name: opus-build
-description: Split build workflow for a Fable or Opus main loop — plan and review here, implement on fresh Opus builders at the roster's pinned effort, breadth-review on external lanes. Use only when the user invokes /opus-build or asks for it by name, for a build that will outlive one context window or span several sessions; the split keeps the main loop's plan and review state hot while builders carry the bulk. Not for work that fits in one sitting (measured 2026-09 in M8, where on a one-session task the split cost about four times solo for equal quality), single-file changes, Q&A, investigation, or sessions on other models.
+description: Split build workflow for a Fable or Opus main loop — plan and review here, implement on fresh Opus builders at the roster's pinned effort, breadth-review on external lanes. Use only when the user invokes /opus-build or asks for it by name, however large the change; the split keeps the main loop's plan and review state hot across a build that outlives one context window or spans several sessions, while builders carry the bulk. Not for work that fits in one sitting (measured 2026-09 in M8, where on a one-session task the split cost about four times solo for equal quality), single-file changes, Q&A, investigation, or sessions on other models.
 ---
 
 # opus-build — plan here, build on Opus, review here
@@ -54,6 +54,7 @@ Standing rules while active:
    whose claim is "a builder executing this order as written produces what the
    user wants", and include the user's original request and the step 1
    decisions, since the order alone cannot reveal a requirement it dropped.
+   It reports a verdict on the claim plus the defect list supporting it.
    Fold the findings in; a finding that needs a user decision reopens step 1
    before dispatch. Only orders that are code all the way through, with tests
    as the check, skip this gate; any protocol, trust, or spec-prose part turns
@@ -117,8 +118,8 @@ scope creep, missed criteria, suspicious test output; only this session knows
 the intent. Review by report: read the builder's hand-back and make targeted
 reads of the lines it names, never the whole diff (measured in M8 to hold).
 
-- Trivial fix (typo-grade): fix inline.
-- Anything more: a narrow fix order to Opus; don't absorb build work here. A
+- A review fix a solo pass finishes in under 10 minutes: do it here, inline.
+- Anything larger: a narrow fix order to Opus; don't absorb build work here. A
   fix order has the full Phase 1 shape, **Touches** included, scoped to the
   findings it fixes, and takes the step 4 gate when the fix changes protocol,
   trust, or spec prose. A builder-reported blocker on an editable out-of-scope
@@ -131,7 +132,8 @@ reads of the lines it names, never the whole diff (measured in M8 to hold).
 ## Phase 4 — Breadth review (external reviewers)
 
 Lane review runs at most twice per build: one breadth pass on the branch head
-here, and one confirming pass on the fixed head in Phase 5. Then stop.
+here, and one confirming pass on the fixed head in Phase 5. Then stop; a
+round the user explicitly asks for past that is outside the bound (Phase 5).
 
 First, commit the Phase-3-approved tree (or name the head if already
 committed). Right after, announce the roster in plain text, naming that head
@@ -214,7 +216,7 @@ name what makes the change low-stakes (size, blast radius, reversibility).
 ## Phase 5 — Triage and close (here, on the main loop)
 
 Adjudicate every lane's findings together (expect noise), dispatch the accepted
-fixes to Opus as one cycle (one fix order, or a few that don't overlap), commit
+fixes to Opus as cycle one (one fix order, or a few that don't overlap), commit
 the fix tree, and announce the base (the breadth head) and the new head.
 
 Then run ONE confirming pass: only the lanes whose findings were accepted,
@@ -231,9 +233,13 @@ Adjudicate its output:
 - A regression of a fix, or an accepted finding still open, is fixed, never
   deferred.
 
-Fixes from the confirming pass go out as one more fix order, get a Phase 3
-review, and the build finishes without another lane round unless the user
-asks for one; the summary says which fixes no lane re-reviewed.
+Fixes from the confirming pass go out as one fix order, cycle two and the
+last. Its Phase 3 review belongs to cycle two and may send back at most one
+narrow correction to the same builder, never a new order. Anything still open
+after that goes into the summary as open, not fixed, and the summary says
+which fixes no lane re-reviewed. A lane round the user explicitly asks for
+after that is outside the bound: its base is the confirming head, and the
+combo-log note logs it as such.
 
 Summarize: what shipped, who reviewed what, which findings were rejected and
 why.
@@ -249,4 +255,4 @@ leaves no sample.
 
 - Session effort for the Fable main loop is the user's call: `high` for
   day-to-day orchestration, `xhigh` for sessions centered on hard design work.
-  Thinking tokens bill as output tokens, so effort is a real Fable-budget lever.
+  Thinking tokens bill as output tokens, so effort is a real cost lever.
