@@ -5,6 +5,7 @@ tokens went.
 Usage:
   bin/measure-session cost   [--json] [--no-dedup] [--include-siblings] <main.jsonl>
   bin/measure-session phases [--json] [--top N] <main.jsonl>
+  bin/measure-session --selftest
 
 <main.jsonl> is a main-loop transcript, ~/.claude/projects/<key>/<uuid>.jsonl.
 Its subagents live beside it in <key>/<uuid>/subagents/agent-*.jsonl, each with
@@ -24,14 +25,23 @@ cost: every transcript priced at RATES, with a per-model and per-transcript
 breakdown and the main/subagent rollup. RATES prices cache writes at the
 5-minute rate; a transcript whose usage reports 1-hour writes
 (cache_creation.ephemeral_1h_input_tokens) is noted with what the 1-hour rate
-(2x uncached input) would add, but the totals stay on RATES.
+(2x uncached input) would add, but the totals stay on RATES. A model with no
+list rate (see rate_for()) is warned about once on stderr, listed under
+"unpriced" in the JSON, and left out of totals; text tables print "?" for a
+cost with nothing priced and a trailing "?" on a lower bound.
 
 phases: main loop only.
   - Phase of each assistant message: the most recent boundary (see classify()).
+    "director" and "commit" are one-shot: they label only the message that
+    runs the command, and the next message returns to the phase before it.
   - Admitted tokens: a message's cache_creation_input_tokens is what that turn
-    newly wrote to cache. It is split in two. The previous message's
-    output_tokens (thinking included; the transcripts show it re-admitted on
-    the next turn) go to "assistant-output", capped at the total. The rest is
+    newly wrote to cache. It is split in three. When cache_read falls short of
+    the previous message's cache_read + cache_creation (TTL expiry, model
+    switch, compaction), the shortfall is prefix written again, not new
+    content: it goes to "cache-rebuild", capped at the total. The previous
+    message's output_tokens (thinking included; the transcripts show it
+    re-admitted on the next turn) go to "assistant-output", capped at what is
+    left. The rest is
     spread over the user-side content that arrived since the previous message
     (tool_result blocks, subagent hand-backs, task notifications, skill
     bodies, prompts) in proportion to character count, bucketed by the tool
@@ -39,12 +49,16 @@ phases: main loop only.
     and attachments (reminders, hook output) are not measured, so their share
     lands on whatever content is present; a turn with no measured content
     puts its remainder in "other" (the first turn's system prompt lands there).
-  - Work orders: one row per Agent call. Main-loop cost runs from the dispatch
+    Buckets are rounded by largest remainder, so each row sums to "admitted".
+  - Work orders: one row per Agent, Task or Workflow call. The join to a
+    subagent transcript uses its meta.json, else the agentId the Agent call's
+    own tool_result reports (toolUseResult). Main-loop cost runs from the dispatch
     message through the message that consumes the result (the hand-back for a
     background agent). Windows of concurrent agents overlap, so the column
     does not sum to the main-loop total.
   - Top admissions: the largest single pieces of user-side content by
     characters, hand-backs and skill bodies included.
+  - The 1-hour TTL note is printed as in cost, for the main loop's messages.
 """
 
 import argparse
@@ -77,16 +91,20 @@ FIELDS = (
 )
 
 BUCKETS = ("Agent", "Bash", "Read", "Grep/Glob", "Skill", "other",
-           "assistant-output")
+           "assistant-output", "cache-rebuild")
 
 PHASE_ORDER = ("plan", "build", "builder-review", "lane", "triage",
                "director", "commit")
+ONE_SHOT = ("director", "commit")
+DISPATCH_TOOLS = ("Agent", "Task", "Workflow")
 MARKER_PHASE = {"1": "plan", "2": "build", "3": "builder-review",
                 "4": "lane", "5": "triage"}
 # A "Phase N" mention after one of these words in the same sentence names a
-# phase still to come ("waiting ... before Phase 3 review"), not the current one.
+# phase still to come ("waiting ... before Phase 3 review") or one passed over
+# ("skipping Phase 4"), not the current one.
 FORWARD_REF = re.compile(r"\b(before|until|once|after|since|waiting|wait|"
-                         r"preparing|prepare|ahead|next|when)\b", re.I)
+                         r"preparing|prepare|ahead|next|when|"
+                         r"skip|skipping|skipped)\b", re.I)
 PLAN_AGENTS = ("Explore", "general-purpose", "Plan")
 READ_ONLY_CMDS = {"cat", "sed", "grep", "rg", "ls", "head", "tail", "find",
                   "wc", "awk", "tree", "stat", "file", "cd", "echo", "date",
@@ -94,8 +112,12 @@ READ_ONLY_CMDS = {"cat", "sed", "grep", "rg", "ls", "head", "tail", "find",
 READ_ONLY_GIT = {"log", "status", "branch", "show", "diff", "rev-parse"}
 READ_ONLY_DIRECTOR = {"status", "render", "--help", "help"}
 NULL_REDIRECTS = re.compile(r"\d?>&\d|\d?>\s*/dev/null")
-LANE_BASH = re.compile(r"k3-review|opus-review")
-REVIEW_WRAPPER = re.compile(r"review[\w.-]*\.sh")
+# Matched against the basename of the program a shell segment runs, so reading
+# a wrapper's tee'd report ($TMPDIR/k3-review-XXXXXX) does not open a lane.
+LANE_WRAPPER = re.compile(r"^(?:k3|opus)-review\.sh$")
+REVIEW_WRAPPER = re.compile(r"review[\w.-]*\.sh$")
+LAUNCHERS = {"env", "nohup", "exec", "bash", "sh", "zsh", "time", "command",
+             "timeout"}
 GIT_COMMIT = re.compile(r"\bgit\s+(?:-C\s+\S+\s+)?(?:commit|push)\b")
 SCRATCH_PATH = re.compile(r"^(?:/private)?/tmp/|/scratchpad/")
 HANDBACK = re.compile(r'<agent-message from="([^"]+)"')
@@ -103,19 +125,20 @@ NOTIFY_ID = re.compile(r"<tool-use-id>([^<]+)</tool-use-id>")
 
 
 def rate_for(model):
-    """Exact match first, then the longest known id that the model starts with.
+    """Exact match first, then a known id plus a date suffix.
 
     Covers dated ids ("claude-opus-5-20260401") and context suffixes
-    ("claude-opus-5[1m]"); returns None for a model we have no list price for.
+    ("claude-opus-5[1m]"); returns None for a model we have no list price for,
+    including an unknown point release ("claude-opus-5-1") of a known family.
     """
     if model in RATES:
         return RATES[model]
     base = model.split("[", 1)[0]
     if base in RATES:
         return RATES[base]
-    for known in sorted(RATES, key=len, reverse=True):
-        if base.startswith(known + "-"):
-            return RATES[known]
+    dated = re.match(r"^(.*)-\d{8}$", base)
+    if dated and dated.group(1) in RATES:
+        return RATES[dated.group(1)]
     return None
 
 
@@ -194,12 +217,28 @@ def tok(usage, field):
     return value if isinstance(value, int) else 0
 
 
+WARNED = set()
+
+
 def usd(model, usage):
-    """List-price cost of one message, or None for an unpriced model."""
+    """List-price cost of one message, or None for an unpriced model. A message
+    with no tokens costs 0 whatever its model (synthetic error records)."""
+    if not any(tok(usage, f) for _, f in FIELDS):
+        return 0.0
     rates = rate_for(model)
     if rates is None:
+        if model not in WARNED:
+            WARNED.add(model)
+            print("%s: warning: %s has no list rate; its cost shows as ? and "
+                  "is left out of totals" % (PROG, model), file=sys.stderr)
         return None
     return sum(tok(usage, f) * rates[i] / 1e6 for i, (_, f) in enumerate(FIELDS))
+
+
+def fmt_usd(value, partial=False, width=9):
+    """'?' for a cost with nothing priced, a trailing '?' on a lower bound."""
+    text = "?" if value is None else "%.4f%s" % (value, "?" if partial else "")
+    return "%*s" % (width, text)
 
 
 def one_hour_writes(usage):
@@ -216,12 +255,14 @@ def summarize(messages):
     for model, usage in messages.values():
         row = by_model.setdefault(model, {
             "messages": 0, "tokens": OrderedDict((f, 0) for _, f in FIELDS),
-            "usd": 0.0, "priced": rate_for(model) is not None,
+            "usd": 0.0, "priced": True,
             "cache_write_1h": 0, "usd_1h_extra": 0.0})
         row["messages"] += 1
         for _, field in FIELDS:
             row["tokens"][field] += tok(usage, field)
         cost = usd(model, usage)
+        if cost is None:
+            row["priced"] = False
         row["usd"] += cost or 0.0
         hour = one_hour_writes(usage)
         row["cache_write_1h"] += hour
@@ -296,12 +337,14 @@ def cost_data(main_path, dedup, include_siblings):
             "no_usage": stats["no_usage"],
             "span": fmt_span(stats["first"], stats["last"]),
             "usd": sum(r["usd"] for r in by_model.values()),
+            "unpriced": [m for m, r in by_model.items() if not r["priced"]],
             "by_model": by_model})
         for model, row in by_model.items():
             agg = rollup.setdefault(model, {
                 "messages": 0, "tokens": OrderedDict((f, 0) for _, f in FIELDS),
-                "usd": 0.0, "priced": row["priced"], "cache_write_1h": 0,
+                "usd": 0.0, "priced": True, "cache_write_1h": 0,
                 "usd_1h_extra": 0.0})
+            agg["priced"] = agg["priced"] and row["priced"]
             agg["messages"] += row["messages"]
             agg["usd"] += row["usd"]
             agg["cache_write_1h"] += row["cache_write_1h"]
@@ -330,8 +373,11 @@ def print_cost(data):
                            for m, r in row["by_model"].items())
         label = row["agent_type"] or row["role"]
         extra = " -- %s" % row["description"] if row["description"] else ""
-        print("%-26s %-20s %5d %10.4f  %s%s" % (
-            row["name"][:26], label[:20], row["messages"], row["usd"],
+        cost = fmt_usd(None if row["unpriced"] and len(row["unpriced"]) ==
+                       len(row["by_model"]) else row["usd"],
+                       bool(row["unpriced"]), 10)
+        print("%-26s %-20s %5d %s  %s%s" % (
+            row["name"][:26], label[:20], row["messages"], cost,
             models, extra))
     print()
     for model, row in data["by_model"].items():
@@ -344,33 +390,39 @@ def print_cost(data):
                 continue
             print("  %-14s %15s tok  @ $%6.2f/M  $%9.4f" % (
                 label, "{:,}".format(tokens), rates[i], tokens * rates[i] / 1e6))
-        if rates is None:
+        if not row["priced"]:
             print("  unknown model: no list rate, not priced")
         else:
             print("  %-14s %45s$%9.4f" % ("subtotal", "", row["usd"]))
         print()
     main = data["transcripts"][0]
     subs = [r for r in data["transcripts"] if r["role"] == "subagent"]
-    print("main       $%9.4f  %d msgs  %s" % (data["main_usd"], main["messages"],
-                                            main["span"]))
-    print("subagents  $%9.4f  %d transcripts, %d msgs" % (
-        data["subagents_usd"], len(subs), sum(r["messages"] for r in subs)))
+    mark = lambda rows: "?" if any(r["unpriced"] for r in rows) else ""
+    print("main       $%9.4f%s  %d msgs  %s" % (
+        data["main_usd"], mark([main]), main["messages"], main["span"]))
+    print("subagents  $%9.4f%s  %d transcripts, %d msgs" % (
+        data["subagents_usd"], mark(subs), len(subs),
+        sum(r["messages"] for r in subs)))
     if data["siblings_usd"]:
         print("siblings   $%9.4f" % data["siblings_usd"])
-    print("TOTAL      $%9.4f" % data["total_usd"])
+    print("TOTAL      $%9.4f%s" % (data["total_usd"],
+                                   "?" if data["unpriced"] else ""))
     collapsed = sum(r["duplicates_collapsed"] for r in data["transcripts"])
     if data["dedup"] and collapsed:
         print("note: %d duplicate assistant records collapsed by message id"
               % collapsed)
-    for model, row in data["by_model"].items():
+    print_ttl_notes(data["by_model"])
+
+
+def print_ttl_notes(by_model):
+    for model, row in by_model.items():
         if row["cache_write_1h"]:
+            extra = "$%.4f" % row["usd_1h_extra"] if row["priced"] else "$? " \
+                "(no list rate)"
             print("note: %s wrote %s cache tokens at the 1-hour TTL; priced "
                   "here at the 5-minute rate, the 1-hour rate (2x input) "
-                  "would add $%.4f" % (model, "{:,}".format(row["cache_write_1h"]),
-                                       row["usd_1h_extra"]))
-    for model in data["unpriced"]:
-        print("warning: %s has no list rate; its tokens are excluded from the "
-              "total" % model, file=sys.stderr)
+                  "would add %s" % (model, "{:,}".format(row["cache_write_1h"]),
+                                    extra))
 
 
 # --- phases -----------------------------------------------------------------
@@ -421,18 +473,28 @@ def load_timeline(path):
 
 
 def user_items(rec, pending):
-    """Measured user-side content of one user record."""
-    content = rec.get("message", {}).get("content")
+    """Measured user-side content of one user record. A lone tool_result
+    carries the record's toolUseResult agentId / isAsync, when present."""
+    message = rec.get("message")
+    content = message.get("content") if isinstance(message, dict) else None
     if isinstance(content, str):
         return [text_item(content, rec.get("isMeta"), pending)]
+    if not isinstance(content, list):
+        return []
+    result = rec.get("toolUseResult")
+    lone = sum(isinstance(b, dict) and b.get("type") == "tool_result"
+               for b in content) == 1 and isinstance(result, dict)
     items = []
-    for block in content or []:
+    for block in content:
         if not isinstance(block, dict):
             continue
         if block.get("type") == "tool_result":
             items.append({"kind": "tool_result",
                           "tool_use_id": block.get("tool_use_id"),
                           "chars": len(text_of(block.get("content")))})
+            if lone and result.get("agentId"):
+                items[-1].update(agent_id=result["agentId"],
+                                 is_async=result.get("isAsync"))
         elif block.get("type") == "text":
             items.append(text_item(block.get("text", ""), rec.get("isMeta"),
                                    pending + items))
@@ -456,13 +518,26 @@ def text_item(text, is_meta, before):
 
 
 def bucket_for(tool_name):
-    if tool_name in ("Agent", "Task"):
+    if tool_name in DISPATCH_TOOLS:
         return "Agent"
     if tool_name in ("Bash", "Read", "Skill"):
         return tool_name
     if tool_name in ("Grep", "Glob"):
         return "Grep/Glob"
     return "other"
+
+
+def link_agents(messages, agent_meta):
+    """Fill a subagent's missing toolUseId (no meta.json) from the agentId its
+    Agent call's own tool_result reports."""
+    launched = {}
+    for msg in messages:
+        for item in msg["inputs"]:
+            if item["kind"] == "tool_result" and item.get("agent_id"):
+                launched[item["agent_id"]] = item["tool_use_id"]
+    for meta in agent_meta:
+        if not meta.get("toolUseId") and meta["agentId"] in launched:
+            meta["toolUseId"] = launched[meta["agentId"]]
 
 
 def resolve_items(messages, tools, agent_meta):
@@ -486,7 +561,8 @@ def deliveries(messages, tools, agent_meta):
     background = {m.get("toolUseId") for m in agent_meta
                   if m.get("requestShape") == "background"}
     for tid, call in tools.items():
-        if call["name"] == "Bash" and call["input"].get("run_in_background"):
+        if call["name"] == "Workflow" or (call["name"] == "Bash" and
+                                          call["input"].get("run_in_background")):
             background.add(tid)
     final, direct = {}, {}
     for idx, msg in enumerate(messages):
@@ -494,6 +570,8 @@ def deliveries(messages, tools, agent_meta):
             tid = item.get("tool_use_id")
             if not tid:
                 continue
+            if item.get("is_async"):
+                background.add(tid)
             if item["kind"] in ("handback", "notification"):
                 final.setdefault(tid, idx)
             elif item["kind"] == "tool_result":
@@ -547,6 +625,34 @@ def is_read_only(command):
     return reads > 0
 
 
+def invoked(command):
+    """Basename of the program each shell segment runs, past env / sh /
+    timeout style launchers and VAR=value assignments."""
+    for segment in bash_segments(command):
+        words = command_words(segment)
+        while words and (words[0] in LAUNCHERS or words[0].startswith("-") or
+                         re.match(r"^(?:[A-Za-z_]\w*=|\d+[smhd]?$)", words[0])):
+            words.pop(0)
+        if words:
+            yield os.path.basename(words[0].strip("\"'"))
+
+
+def lane_launch(command, inp):
+    """True when a Bash command invokes a lane wrapper (not reads its report)."""
+    return any(LANE_WRAPPER.search(p) or (inp.get("run_in_background") and
+                                          REVIEW_WRAPPER.search(p))
+               for p in invoked(command))
+
+
+def builds(name, inp):
+    """A dispatch of build work: an opus-builder agent, or a Workflow run
+    whose inline script names opus-builder (or that has no inline script)."""
+    if name == "Workflow":
+        script = inp.get("script")
+        return not isinstance(script, str) or "opus-builder" in script
+    return str(inp.get("subagent_type", "")) == "opus-builder"
+
+
 def marker_phase(text):
     """Phase named by the last present-tense "Phase N" mention, or None."""
     phase = None
@@ -557,40 +663,44 @@ def marker_phase(text):
     return phase
 
 
-def message_signals(msg, build_started):
+def message_signals(msg, in_plan):
     """Candidate (priority, phase, reason) boundaries opened by this message's
-    own blocks, plus the tool ids whose consumption opens a later phase."""
+    own blocks, plus the tool ids whose consumption opens a later phase. Plan
+    signals count only while the session is still in plan."""
     found, watch = [], {}
     for block in msg["blocks"]:
         if block.get("type") == "text":
             phase = marker_phase(block.get("text", ""))
-            if phase:
+            if phase and (phase != "plan" or in_plan):
                 found.append((1, phase, "text marker"))
         if block.get("type") != "tool_use":
             continue
         name, inp, tid = block.get("name"), block.get("input") or {}, block.get("id")
         agent_type = str(inp.get("subagent_type", ""))
         command = str(inp.get("command", "")) if name == "Bash" else ""
-        if name in ("Agent", "Task") and agent_type == "opus-builder":
+        dispatch = name in DISPATCH_TOOLS
+        if dispatch and builds(name, inp):
             found.append((2, "build", "builder dispatch"))
             watch[tid] = "builder-review"
         elif name in ("Write", "Edit", "MultiEdit", "NotebookEdit") and \
                 not SCRATCH_PATH.search(str(inp.get("file_path", ""))):
             found.append((2, "build", "main-loop repo write"))
-        elif name in ("Agent", "Task") and agent_type in PLAN_AGENTS:
-            found.append((3, "plan", "scout dispatch"))
+        elif dispatch and (agent_type.startswith("codex:") or
+                           agent_type == "opus-reviewer"):
+            found.append((4, "lane", "review agent"))
+            watch[tid] = "triage"
+        elif dispatch and (agent_type in PLAN_AGENTS or name == "Workflow"):
+            if in_plan:
+                found.append((3, "plan", "scout dispatch"))
         elif name == "Skill" and inp.get("skill") == "opus-build":
-            found.append((3, "plan", "opus-build activation"))
-        elif not build_started and (name in ("Read", "Grep", "Glob") or
-                                    (command and is_read_only(command))):
+            if in_plan:
+                found.append((3, "plan", "opus-build activation"))
+        elif in_plan and (name in ("Read", "Grep", "Glob") or
+                          (command and is_read_only(command))):
             found.append((3, "plan", "pre-build read"))
         elif name == "Skill" and inp.get("skill") == "codex:rescue":
             found.append((4, "lane", "codex:rescue skill"))
-        elif name in ("Agent", "Task") and agent_type.startswith("codex:"):
-            found.append((4, "lane", "codex agent"))
-            watch[tid] = "triage"
-        elif command and (LANE_BASH.search(command) or (
-                inp.get("run_in_background") and REVIEW_WRAPPER.search(command))):
+        elif command and lane_launch(command, inp):
             found.append((4, "lane", "review wrapper"))
             watch[tid] = "triage"
         elif command and any(GIT_COMMIT.search(s) for s in bash_segments(command)):
@@ -604,36 +714,46 @@ def classify(messages, consumed_at):
     """Label every message with the phase of the most recent boundary.
 
     Priority within one message (lowest number wins): 1 a present-tense
-    "Phase N" text marker; 2 a builder dispatch (or main-loop repo write),
-    then consuming a builder's result; 3 plan signals; 4 a lane launch, then
-    consuming a lane's result; 5 commit, then director. Before any boundary
-    the phase is plan.
+    "Phase N" text marker; 2 a builder dispatch (Agent, Task or Workflow) or
+    main-loop repo write, then consuming a builder's result; 3 plan signals,
+    only while still in plan (before any build, lane or review boundary);
+    4 a lane launch (codex, opus-reviewer, a review wrapper), then consuming a
+    lane's result, which opens triage; 5 commit, then director. Before any
+    boundary the phase is plan. commit and director are one-shot: they label
+    their own message only, and the phase before them carries on.
     """
-    phase, build_started, watching = "plan", False, {}
+    phase, watching = "plan", {}
     for idx, msg in enumerate(messages):
-        found, watch = message_signals(msg, build_started)
+        found, watch = message_signals(msg, phase == "plan")
         for tid, opens in watching.items():
             if consumed_at.get(tid) == idx:
                 rank = 2.5 if opens == "builder-review" else 4.5
                 found.append((rank, opens, "result consumed"))
         watching.update(watch)
+        label = phase
         if found:
-            _, phase, reason = min(found, key=lambda f: f[0])
+            _, label, reason = min(found, key=lambda f: f[0])
             msg["reason"] = reason
-        if any(p == "build" for _, p, _ in found):
-            build_started = True
-        msg["phase"] = phase
+            if label not in ONE_SHOT:
+                phase = label
+        msg["phase"] = label
 
 
 def attribute(messages):
-    """Split each message's cache writes over assistant-output and buckets."""
-    prev_out = 0
+    """Split each message's cache writes over cache-rebuild, assistant-output
+    and the buckets of the content that arrived since the previous message."""
+    prev_out, prev_cached = 0, None
     for msg in messages:
         usage = msg["usage"]
         written = tok(usage, "cache_creation_input_tokens")
+        cached = tok(usage, "cache_read_input_tokens")
         split = OrderedDict((b, 0.0) for b in BUCKETS)
-        split["assistant-output"] = float(min(prev_out, written))
-        rest = written - split["assistant-output"]
+        if prev_cached is not None:
+            split["cache-rebuild"] = float(min(max(prev_cached - cached, 0),
+                                               written))
+        new = written - split["cache-rebuild"]
+        split["assistant-output"] = float(min(prev_out, new))
+        rest = new - split["assistant-output"]
         chars = sum(i["chars"] for i in msg["inputs"])
         if chars:
             for item in msg["inputs"]:
@@ -642,8 +762,18 @@ def attribute(messages):
             split["other"] += rest
         msg["admitted"] = written
         msg["split"] = split
-        msg["usd"] = usd(msg["model"], usage) or 0.0
-        prev_out = tok(usage, "output_tokens")
+        msg["usd"] = usd(msg["model"], usage)
+        if any(tok(usage, f) for _, f in FIELDS):
+            prev_out, prev_cached = tok(usage, "output_tokens"), cached + written
+
+
+def lr_round(values, total):
+    """Round to integers summing to total, by largest remainder."""
+    out = OrderedDict((k, int(v)) for k, v in values.items())
+    order = sorted(values, key=lambda k: values[k] - out[k], reverse=True)
+    for key in order[:max(total - sum(out.values()), 0)]:
+        out[key] += 1
+    return out
 
 
 def preview(call):
@@ -666,17 +796,23 @@ def phase_rows(messages):
     rows = OrderedDict()
     for msg in messages:
         row = rows.setdefault(msg["phase"], {
-            "phase": msg["phase"], "messages": 0, "usd": 0.0, "admitted": 0,
+            "phase": msg["phase"], "messages": 0, "usd": 0.0,
+            "unpriced_messages": 0, "admitted": 0,
             "split": OrderedDict((b, 0.0) for b in BUCKETS)})
         row["messages"] += 1
-        row["usd"] += msg["usd"]
+        if msg["usd"] is None:
+            row["unpriced_messages"] += 1
+        else:
+            row["usd"] += msg["usd"]
         row["admitted"] += msg["admitted"]
         for bucket, value in msg["split"].items():
             row["split"][bucket] += value
     order = {p: i for i, p in enumerate(PHASE_ORDER)}
     out = sorted(rows.values(), key=lambda r: order.get(r["phase"], 99))
     for row in out:
-        row["split"] = OrderedDict((b, round(v)) for b, v in row["split"].items())
+        row["split"] = lr_round(row["split"], row["admitted"])
+        if row["unpriced_messages"] == row["messages"]:
+            row["usd"] = None
     return out
 
 
@@ -686,27 +822,35 @@ def work_order_rows(messages, tools, agent_meta, consumed_at):
     result_chars = {}
     for msg in messages:
         for item in msg["inputs"]:
-            if item["tool"] in ("Agent", "Task") and item["kind"] in (
-                    "handback", "tool_result"):
-                key = (item["tool_use_id"], item["kind"])
+            # A Workflow's result arrives as its task notification.
+            kind = "handback" if item["kind"] == "notification" and \
+                item["tool"] == "Workflow" else item["kind"]
+            if item["tool"] in DISPATCH_TOOLS and kind in ("handback",
+                                                           "tool_result"):
+                key = (item["tool_use_id"], kind)
                 result_chars[key] = result_chars.get(key, 0) + item["chars"]
     rows = []
     for tid, call in tools.items():
-        if call["name"] not in ("Agent", "Task"):
+        if call["name"] not in DISPATCH_TOOLS:
             continue
         meta = by_tool.get(tid, {})
         start = index[call["msg"]]
         end = consumed_at.get(tid, len(messages) - 1)
-        main_usd = sum(m["usd"] for m in messages[start:end + 1])
+        window = messages[start:end + 1]
+        main_usd = sum(m["usd"] for m in window if m["usd"] is not None)
         builder_usd = meta.get("usd")
+        workflow = call["name"] == "Workflow"
         rows.append({
             "tool_use_id": tid,
-            "agent_type": call["input"].get("subagent_type") or "general-purpose",
-            "description": call["input"].get("description", ""),
+            "agent_type": "workflow" if workflow else
+            call["input"].get("subagent_type") or "general-purpose",
+            "description": call["input"].get("name" if workflow else
+                                             "description") or "",
             "agent_file": meta.get("path"),
             "builder_usd": builder_usd,
             "builder_messages": meta.get("messages"),
             "main_usd": main_usd,
+            "main_unpriced": sum(m["usd"] is None for m in window),
             "main_messages": end - start + 1,
             "consumed": tid in consumed_at,
             "ack_chars": result_chars.get((tid, "tool_result"), 0),
@@ -734,10 +878,12 @@ def load_agent_meta(main_path):
         messages, _ = load_messages(path)
         by_model = summarize(messages)
         entry = dict(meta)
+        priced = all(r["priced"] for r in by_model.values())
         entry.update(path=path, messages=len(messages),
                      agentId=entry.get("agentId") or
                      os.path.basename(path)[len("agent-"):-len(".jsonl")],
-                     usd=sum(r["usd"] for r in by_model.values()))
+                     usd=sum(r["usd"] for r in by_model.values())
+                     if priced else None)
         metas.append(entry)
     return metas
 
@@ -745,46 +891,61 @@ def load_agent_meta(main_path):
 def phases_data(main_path, top):
     messages, tools = load_timeline(main_path)
     agent_meta = load_agent_meta(main_path)
+    link_agents(messages, agent_meta)
     resolve_items(messages, tools, agent_meta)
     consumed_at = deliveries(messages, tools, agent_meta)
     classify(messages, consumed_at)
     attribute(messages)
+    by_model = summarize(OrderedDict((m["id"], (m["model"], m["usage"]))
+                                     for m in messages))
     return {
         "main": main_path,
         "messages": len(messages),
-        "usd": sum(m["usd"] for m in messages),
+        "usd": sum(m["usd"] for m in messages if m["usd"] is not None),
+        "unpriced": [m for m, r in by_model.items() if not r["priced"]],
         "admitted": sum(m["admitted"] for m in messages),
         "phases": phase_rows(messages),
         "work_orders": work_order_rows(messages, tools, agent_meta, consumed_at),
         "top_admissions": top_admissions(messages, tools, top),
+        "one_hour": OrderedDict(
+            (m, {"cache_write_1h": r["cache_write_1h"], "priced": r["priced"],
+                 "usd_1h_extra": r["usd_1h_extra"] if r["priced"] else None})
+            for m, r in by_model.items() if r["cache_write_1h"]),
         "timeline": [{"id": m["id"], "phase": m["phase"],
                       "boundary": m.get("reason"), "usd": m["usd"],
                       "admitted": m["admitted"],
-                      "split": {b: round(v) for b, v in m["split"].items()}}
+                      "split": lr_round(m["split"], m["admitted"])}
                      for m in messages]}
 
 
 def print_phases(data):
-    short = ("Agent", "Bash", "Read", "Grep/Glob", "Skill", "other", "asst-out")
+    short = ("Agent", "Bash", "Read", "Grep/Glob", "Skill", "other", "asst-out",
+             "rebuild")
     print("%-15s %5s %9s %9s  " % ("phase", "msgs", "USD", "admitted")
           + " ".join("%9s" % s for s in short))
     for row in data["phases"]:
-        print("%-15s %5d %9.4f %9d  " % (row["phase"], row["messages"],
-                                         row["usd"], row["admitted"])
+        print("%-15s %5d %s %9d  " % (row["phase"], row["messages"],
+                                      fmt_usd(row["usd"],
+                                              row["unpriced_messages"]),
+                                      row["admitted"])
               + " ".join("%9d" % v for v in row["split"].values()))
-    print("%-15s %5d %9.4f %9d" % ("total", data["messages"], data["usd"],
-                                   data["admitted"]))
+    unpriced = sum(r["unpriced_messages"] for r in data["phases"])
+    print("%-15s %5d %s %9d" % ("total", data["messages"],
+                                fmt_usd(None if unpriced == data["messages"]
+                                        else data["usd"], unpriced),
+                                data["admitted"]))
     print()
     print("%-22s %-40s %9s %9s %6s %8s %7s" % (
         "agent type", "description", "agent $", "main $", "main#",
         "result", "ratio"))
     for row in data["work_orders"]:
-        agent = "%9.4f" % row["builder_usd"] if row["builder_usd"] is not None \
-            else "%9s" % "?"
         ratio = "%7.2f" % row["ratio"] if row["ratio"] is not None else "%7s" % "-"
-        print("%-22s %-40s %s %9.4f %6d %8d %s%s" % (
-            row["agent_type"][:22], row["description"][:40], agent,
-            row["main_usd"], row["main_messages"], row["result_chars"], ratio,
+        print("%-22s %-40s %s %s %6d %8d %s%s" % (
+            row["agent_type"][:22], row["description"][:40],
+            fmt_usd(row["builder_usd"]),
+            fmt_usd(None if row["main_unpriced"] == row["main_messages"]
+                    else row["main_usd"], row["main_unpriced"]),
+            row["main_messages"], row["result_chars"], ratio,
             "" if row["consumed"] else "  (result never consumed)"))
     print()
     print("%6s  %-12s %-6s %-15s %s" % ("chars", "kind", "tool", "phase", "input"))
@@ -792,9 +953,51 @@ def print_phases(data):
         print("%6d  %-12s %-6s %-15s %s" % (item["chars"], item["kind"],
                                            item["tool"], item["phase"],
                                            item["input"]))
+    if data["one_hour"]:
+        print()
+        print_ttl_notes(data["one_hour"])
+
+
+def selftest():
+    """Check the pure rules on inline cases; exit status 1 on any failure."""
+    def msg(*blocks, cached=0, written=0, out=0, inputs=()):
+        return {"id": len(blocks), "blocks": list(blocks), "inputs": list(inputs),
+                "model": "claude-opus-5", "usage": {
+                    "cache_read_input_tokens": cached, "output_tokens": out,
+                    "cache_creation_input_tokens": written}}
+    bash = lambda c: {"type": "tool_use", "name": "Bash", "input": {"command": c}}
+    seq = [msg({"type": "tool_use", "name": "Agent", "id": "b",
+                "input": {"subagent_type": "opus-builder"}}),
+           msg(bash("director emit --type note")), msg(bash("git commit -F m")),
+           msg({"type": "tool_use", "name": "Agent", "input": {
+               "subagent_type": "Explore"}}), msg(bash("cat /tmp/k3-review-x1"))]
+    classify(seq, {})
+    reb = [msg(cached=0, written=1000, out=50),
+           msg(cached=200, written=900, inputs=[{"chars": 3, "bucket": "Bash"}])]
+    attribute(reb)
+    checks = {
+        "dated id": rate_for("claude-opus-5-20260401") == RATES["claude-opus-5"],
+        "point release": rate_for("claude-opus-5-1") is None,
+        "context suffix": rate_for("claude-opus-5[1m]") == RATES["claude-opus-5"],
+        "rounding": sum(lr_round({"a": 1.4, "b": 1.3, "c": 0.3}, 3).values()) == 3,
+        "skip marker": marker_phase("Skipping Phase 4: low stakes.") is None,
+        "marker": marker_phase("Doing a Phase 3 read.") == "builder-review",
+        "lane launch": lane_launch("cd r; ~/s/k3-review.sh 'p; q'", {}),
+        "report read": not lane_launch("cat /tmp/k3-review-abc", {}),
+        "one-shot": [m["phase"] for m in seq] ==
+        ["build", "director", "commit", "build", "build"],
+        "rebuild": reb[1]["split"]["cache-rebuild"] == 800 and
+        reb[1]["split"]["assistant-output"] == 50,
+    }
+    failed = [name for name, ok in checks.items() if not ok]
+    print("selftest: %d/%d ok%s" % (len(checks) - len(failed), len(checks),
+                                    "; failed: " + ", ".join(failed) if failed else ""))
+    sys.exit(1 if failed else 0)
 
 
 def main():
+    if sys.argv[1:] == ["--selftest"]:
+        selftest()
     ap = argparse.ArgumentParser(
         prog=PROG,
         description="Cost and phase breakdown of one Claude Code session.")
