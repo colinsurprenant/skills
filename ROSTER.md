@@ -100,11 +100,15 @@ stay stable while the questions change. Per-lane counts cover the Phase 4
 breadth pass only, so they describe one tree per lane; the note as a whole may
 span a confirming head. The Phase 5 confirming pass does not increment those
 counts: it increments `fix_cycles` instead, once per fix cycle actually run and
-not per finding — a regression, a still-open accepted finding, or a blocking
-new finding can each call for a cycle, several found on one pass batch into
-one, and a return to Phase 1 is a restart, not a cycle (Phase 3 fixes count
-there too, so the value is not fixed), while a deferred follow-up goes in
-`note=`.
+not per finding. `fix_cycles` counts Phase 5 cycles only, 0 to 2: the triage
+fix dispatch after the breadth pass is the first, and the fix order that
+follows the confirming pass (reviewed in Phase 3, no further lane round) is
+the second and last. A regression, a still-open accepted finding, or a
+blocking new finding can each call for that second cycle, and several found on
+one pass batch into it. Phase 3 fix orders issued before the breadth pass are
+not fix cycles; they count in `bounced`. A deferred follow-up, and any lane
+round the user asks for past the bound, go in `note=`. This definition of
+`fix_cycles` changed 2026-09-28, so earlier records are not comparable on it.
 
 ## Swap procedure
 

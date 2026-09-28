@@ -7,7 +7,7 @@
 # Anthropic API only. Two boundaries: the tool allowlist keeps the reviewer
 # read-only at the harness layer, srt repeats it at the OS layer. Reviewers
 # never need write access, so the boundary costs nothing — this is least
-# privilege, not distrust of Opus. Bills the Opus half of the Anthropic quota —
+# privilege, not distrust of Opus. Bills the Anthropic quota —
 # NOT a no-cost lane like Codex/K3.
 set -euo pipefail
 

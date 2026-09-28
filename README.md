@@ -51,17 +51,18 @@ so they're snapshotted, diffed, and the file is audited against them.
 
 ### Build workflow: judgment and volume where they belong
 
-Pro/Max plans share one usage pool and models differ in strengths, so the
-build loop is split: judgment (planning, review) stays on the strongest
-model, implementation volume goes to Opus, and breadth review runs on
-external harnesses, under OS-level confinement (see Sandboxing).
+A long build outgrows one context window, so the build loop is split:
+judgment (planning, review) stays hot on the main loop, implementation
+volume goes to fresh Opus builders, and breadth review runs on external
+harnesses, under OS-level confinement (see Sandboxing).
 
-- **[opus-build/](opus-build/SKILL.md)**: the split build workflow. Plan and
-  review on the main loop, build on fresh Opus subagents at the effort pinned
-  in roster.conf, breadth-review on whichever external lanes are installed
-  (Codex, Kimi K3, a sandboxed Opus). On a Fable main loop the split is about
-  budget; on an Opus main loop it is about context, and the skill states which
-  mode it is in.
+- **[opus-build/](opus-build/SKILL.md)**: the split build workflow, invoked
+  explicitly for builds that span more than one session. Plan and review on
+  the main loop, build on fresh Opus subagents at the effort pinned in
+  roster.conf, breadth-review on whichever external lanes are installed
+  (Codex, Kimi K3, a sandboxed Opus). The split buys context continuity, not
+  a token saving: measured on a one-session task, it cost more than a solo
+  run for equal quality.
   [review-2026-07-27.md](opus-build/review-2026-07-27.md) is the
   adversarial review from its first validation run;
   [sandbox/](opus-build/sandbox/) confines the headless review lanes.
@@ -163,7 +164,7 @@ every skill work with any persona or none, and it is the first thing to
 rewrite in a fork. Keep the structure, replace the voice.
 
 The transferable ideas are the routing header, the audit skill, the
-budget-split workflow, and the roster-verified bindings.
+context-split build workflow, and the roster-verified bindings.
 
 ## License
 
