@@ -264,7 +264,8 @@ def one_hour_writes(usage):
     if isinstance(detail, dict):
         value = detail.get("ephemeral_1h_input_tokens", 0)
         if isinstance(value, int):
-            return min(max(value, 0), tok(usage, "cache_creation_input_tokens"))
+            return min(max(value, 0),
+                       max(tok(usage, "cache_creation_input_tokens"), 0))
     return 0
 
 
@@ -1030,6 +1031,10 @@ def selftest():
                   "cache_creation": {"ephemeral_5m_input_tokens": 400000,
                                      "ephemeral_1h_input_tokens": 600000}}
     flat_usage = {"cache_creation_input_tokens": mtok}
+    over_usage = {"cache_creation_input_tokens": 100,
+                  "cache_creation": {"ephemeral_1h_input_tokens": 500}}
+    mixed = summarize({1: ("claude-opus-5", hour_usage),
+                       2: ("claude-opus-5", flat_usage)})["claude-opus-5"]
     near = lambda a, b: a is not None and abs(a - b) < 1e-9
     checks = {
         "1h write rate": near(usd("claude-opus-5", hour_usage),
@@ -1037,6 +1042,10 @@ def selftest():
         "5m fallback": near(usd("claude-opus-5", flat_usage), 6.25),
         "1h in summary": summarize({1: ("claude-opus-5", hour_usage)})
         ["claude-opus-5"]["cache_write_1h"] == 600000,
+        "1h clamp": near(usd("claude-opus-5", over_usage), 100 * 10.0 / 1e6),
+        "mixed split": near(sum(n * r for _, n, r in priced_lines(
+            mixed["tokens"], mixed["cache_write_1h"], RATES["claude-opus-5"])),
+            mixed["usd"]),
         "fable-5 row": rate_for("claude-fable-5") == (10.0, 1.00, 12.50, 20.0, 50.0)
         and near(usd("claude-fable-5", {"cache_read_input_tokens": mtok}), 1.0),
         "fable-5-1 row": near(usd("claude-fable-5-1",
