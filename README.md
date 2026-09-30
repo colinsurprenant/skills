@@ -14,10 +14,13 @@ hardcoded paths. The persona is mine: fork and edit.
 To update later: `git pull`, then `bin/install` again. Pulled edits to
 skills and agents land live through the symlinks, except the Codex agent files:
 those are generated copies (Codex refuses symlinked agent files) that reach
-Codex on the next `bin/install`, which refreshes the ones it generated earlier.
-The rerun also creates links a pull introduced (and drops the pre-rename
-`opus-build`, `opus-builder` and `opus-reviewer` links if you have them), is
-otherwise a no-op, and ends with the doctor report either way.
+Codex on the next `bin/install`, which refreshes the ones it generated earlier
+when `~/.agents/skills/delegate-build` links into this clone (otherwise one
+"not refreshed" row and nothing touched). The rerun also creates links a pull
+introduced (and drops the pre-rename `opus-build`, `opus-builder` and
+`opus-reviewer` links if you have them), is otherwise a no-op, and ends with
+the doctor report either way. It exits non-zero if a link cannot be created or,
+under a harness flag such as `--codex`, is refused.
 
 ## What's here
 
@@ -83,9 +86,9 @@ Sandboxing).
 - **[agents/delegate-builder.md](agents/delegate-builder.md)**,
   **[agents/claude-reviewer.md](agents/claude-reviewer.md)** and
   **[agents/scout.md](agents/scout.md)**: the pinned-model build, review and
-  scouting agents it dispatches to. `bin/roster-render` also generates Codex
-  copies of the builder, scout and researcher (not committed; see
-  [SETUP.md](SETUP.md)).
+  scouting agents it dispatches to. `bin/roster-render --codex <dir>` also
+  generates Codex copies of the builder, scout and researcher (not committed;
+  `bin/install --codex` installs them; see [SETUP.md](SETUP.md)).
 - **[commands/iterate.md](commands/iterate.md)**: the discovery-driven loop
   for fuzzy-scope work (frame, build, evaluate, decide). Its premise: in
   discovery work the spec is an output, written at convergence rather than
@@ -125,8 +128,9 @@ and supervision rather than model goodwill:
 - From a **Codex** main loop, workers inherit its workspace-write sandbox (Codex
   cannot give a worker a narrower one), so the scout and researcher are
   read-only by instruction only. The Kimi and Claude wrapper scripts run
-  escalated with the user's approval, because srt cannot start inside Codex's
-  own sandbox, and re-confine themselves under srt once outside it.
+  escalated through Codex's own approval prompt, because srt cannot start
+  inside Codex's own sandbox, and re-confine themselves under srt once outside
+  it.
 - **Everything else** in a Claude Code session, the main loop and the build
   subagents included, runs with Claude Code's own permission prompts. Its
   native Bash sandbox is available and documented in [SETUP.md](SETUP.md), but

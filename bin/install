@@ -5,15 +5,27 @@
 # --codex also links the delegate-build skill into ~/.agents/skills and renders
 # the delegate-builder, scout and researcher agent files into ~/.codex/agents.
 # Those are regular files, not links (Codex refuses a symlinked agent file), so
-# they do not follow a git pull by themselves: every run, with or without
-# --codex, refreshes the ones an earlier run generated, and never creates them
-# or the ~/.agents link without --codex. A path there that bin/roster-render did
-# not generate (no marker line) or that is a symlink is an error, left alone.
+# they do not follow a git pull by themselves. A plain run (no --codex)
+# refreshes the ones an earlier run generated, but only when
+# ~/.agents/skills/delegate-build links to THIS clone's delegate-build: that
+# link is what says whose files they are. With generated files present and no
+# such link (missing, or pointing at another clone) it prints one "not
+# refreshed" row, touches nothing and does not fail; with no generated files it
+# prints nothing. A plain run never creates the files or the ~/.agents link.
+# Under --codex (and so --all) a path in ~/.codex/agents that bin/roster-render
+# did not generate (no marker line), or that is a symlink, is an error left
+# alone, and so is a refused or failed ~/.agents link: then no agent file is
+# rendered at all, and the run exits non-zero.
 # Before linking, removes links left by the delegate-build rename (opus-build,
 # opus-builder, opus-reviewer) that still name their old target in this clone.
 # Idempotent and non-clobbering:
 # a link already resolving into this clone is left alone, and anything else
-# occupying a target path is reported, never replaced. Finishes by running
+# occupying a target path is reported, never replaced. Exit status: a link that
+# cannot be created (mkdir or ln fails) is a failure row and exits non-zero. A
+# link that is refused (something else occupies the path) is reported and left
+# alone; for the always-on Claude Code set doctor's required rows judge that,
+# but under an explicitly requested harness flag (--codex, --opencode,
+# --copilot, --all) it exits non-zero as well. Finishes by running
 # bin/doctor, which is the referee for whether the install actually took —
 # if this script and doctor ever disagree about a link, doctor wins.
 #
@@ -33,7 +45,10 @@ for arg in "$@"; do
   esac
 done
 
-made=0; kept=0; removed=0; refused=0; render_failed=0
+made=0; kept=0; removed=0; refused=0; failed=0; flag_refused=0; render_failed=0
+# 1 while linking for a harness the caller asked for by flag: a refused link
+# there fails the run, where for the always-on Claude set doctor is the judge.
+explicit=0
 OK="  ok  "; NO="  --  "
 # The ~ goes through a variable: bash 5 tilde-expands a literal ~ in the
 # replacement back to $HOME, and bash 3.2 keeps a backslash-escaped one.
@@ -91,17 +106,23 @@ migrate_pre_rename() {
   [ "$found" = 1 ] || row "pre-rename links" "$OK" "none present"
 }
 
+# Returns 0 when the link is in place (created or already there), 1 when the
+# path is occupied by something else (refused), 2 when it could not be created.
 link() { # link <repo-relative source> <absolute target>
-  src="$repo/$1"; dst="$2"
+  local src="$repo/$1" dst="$2" err
   if links_to "$dst" "$src"; then
-    row "$dst" "$OK" "already linked"; kept=$((kept+1))
+    row "$dst" "$OK" "already linked"; kept=$((kept+1)); return 0
   elif [ -e "$dst" ] || [ -L "$dst" ]; then
     row "$dst" "$NO" "exists and is not a link to its documented target; left alone"; refused=$((refused+1))
-  else
-    mkdir -p "$(dirname "$dst")"
-    ln -s "$src" "$dst"
-    row "$dst" "$OK" "created"; made=$((made+1))
+    [ "$explicit" = 0 ] || flag_refused=$((flag_refused+1))
+    return 1
   fi
+  if err="$( { mkdir -p -- "$(dirname "$dst")" && ln -s -- "$src" "$dst"; } 2>&1 )"; then
+    row "$dst" "$OK" "created"; made=$((made+1)); return 0
+  fi
+  err="${err%%$'\n'*}"
+  row "$dst" "$NO" "could not be created${err:+: $err}"; failed=$((failed+1))
+  return 2
 }
 
 # agents/*.md frontmatter is generated from roster.conf, so render it before
@@ -162,36 +183,60 @@ link agents/researcher.md        "$HOME/.claude/agents/researcher.md"
 link agents/scout.md             "$HOME/.claude/agents/scout.md"
 link commands/iterate.md         "$HOME/.claude/commands/iterate.md"
 
+codex_dir="$HOME/.codex/agents"
+codex_skill="$HOME/.agents/skills/delegate-build"
 if [ "$do_codex" = 1 ]; then
   echo
   echo "Codex CLI"
+  explicit=1
   link AGENT_BEHAVIOR.md "$HOME/.codex/AGENTS.md"
-  link delegate-build "$HOME/.agents/skills/delegate-build"
-  c_out="$("$repo/bin/roster-render" --codex "$HOME/.codex/agents" 2>&1)"; c_rc=$?
-  codex_rows "$c_out" "$c_rc"
-else
-  # Without --codex nothing is created; files a --codex run generated earlier
-  # are brought up to date, so a pull that changed roster.conf or an agent body
-  # reaches Codex on the next install. --refresh prints nothing when there is
-  # nothing to refresh, and then so does this.
-  c_out="$("$repo/bin/roster-render" --codex "$HOME/.codex/agents" --refresh 2>&1)"; c_rc=$?
-  if [ -n "$c_out" ] || [ "$c_rc" -ne 0 ]; then
-    echo
-    echo "Codex agent files (refreshed; bin/install --codex creates them)"
+  # The skill link is what marks the agent files as this clone's, so a refused
+  # or failed one means no file is rendered: they would belong to no link.
+  if link delegate-build "$codex_skill"; then
+    c_out="$("$repo/bin/roster-render" --codex "$codex_dir" 2>&1)"; c_rc=$?
     codex_rows "$c_out" "$c_rc"
+  else
+    row "$codex_dir" "$NO" "agent files not rendered: the delegate-build skill link above is not in place"
+  fi
+  explicit=0
+else
+  # Without --codex nothing is created. Files a --codex run generated earlier
+  # are brought up to date, so a pull that changed roster.conf or an agent body
+  # reaches Codex on the next install, but only when the skill link says they
+  # are this clone's. --refresh prints nothing when there is nothing to
+  # refresh, and then so does this; --refresh --check is the same question
+  # asked without writing ("is a generated file there?").
+  if links_to "$codex_skill" "$repo/delegate-build"; then
+    c_out="$("$repo/bin/roster-render" --codex "$codex_dir" --refresh 2>&1)"; c_rc=$?
+    if [ -n "$c_out" ] || [ "$c_rc" -ne 0 ]; then
+      echo
+      echo "Codex agent files (refreshed; bin/install --codex creates them)"
+      codex_rows "$c_out" "$c_rc"
+    fi
+  else
+    c_out="$("$repo/bin/roster-render" --codex "$codex_dir" --refresh --check 2>&1)" || true
+    if [ -n "$c_out" ]; then
+      echo
+      echo "Codex agent files"
+      row "$codex_dir" "$NO" "not refreshed: they belong to another clone, or ~/.agents/skills/delegate-build does not link to this one"
+    fi
   fi
 fi
 
 if [ "$do_opencode" = 1 ]; then
   echo
   echo "OpenCode"
+  explicit=1
   link AGENT_BEHAVIOR.md "$HOME/.config/opencode/AGENTS.md"
+  explicit=0
 fi
 
 if [ "$do_copilot" = 1 ]; then
   echo
   echo "Copilot CLI"
+  explicit=1
   link AGENT_BEHAVIOR.md "$HOME/.copilot/copilot-instructions.md"
+  explicit=0
 fi
 
 echo
@@ -200,6 +245,12 @@ if [ "$refused" -gt 0 ]; then
   echo "Paths left alone hold your existing content. Fold it into your fork"
   echo "first (see SETUP.md), move the old file away, then rerun."
 fi
+if [ "$flag_refused" -gt 0 ]; then
+  echo "$flag_refused link(s) you asked for by flag were left alone: this run exits non-zero."
+fi
+if [ "$failed" -gt 0 ]; then
+  echo "$failed link(s) could not be created (rows above): this run exits non-zero."
+fi
 if [ "$render_failed" = 1 ]; then
   echo "bin/roster-render failed: agents/*.md frontmatter or the Codex agent files may not match roster.conf."
 fi
@@ -207,8 +258,10 @@ fi
 # doctor is the referee for the links, but it cannot see that the render failed
 # — it reports on whatever the agent files currently say. So run it (not exec:
 # its status is a verdict to weigh, not the last word) and let a failed render
-# fail the install regardless of what doctor made of the result.
+# fail the install regardless of what doctor made of the result. A link that
+# could not be created, or that was refused where a flag asked for it, fails it
+# the same way.
 "$repo/bin/doctor"
 doctor_status=$?
-if [ "$render_failed" = 1 ]; then exit 1; fi
+if [ "$render_failed" = 1 ] || [ "$failed" -gt 0 ] || [ "$flag_refused" -gt 0 ]; then exit 1; fi
 exit "$doctor_status"

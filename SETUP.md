@@ -30,13 +30,25 @@ target is left alone, and anything else found at a target path, a stray
 file or a link to the wrong place, is reported and kept, never replaced. The manual sections below are the same links spelled out,
 kept for transparency and for partial installs.
 
+Exit status: a link that cannot be created (for example a parent directory that
+cannot be made) is a failure row and exits non-zero. A refused link, one whose
+path is occupied by something else, keeps today's semantics for the always-on
+Claude Code set (the doctor report's required rows judge it), but under an
+explicitly requested flag (`--codex`, `--opencode`, `--copilot`, `--all`) it
+exits non-zero as well.
+
 `--codex` does more than link: besides the `AGENTS.md` link it links
 `delegate-build` into `~/.agents/skills` and renders three Codex agent files
 (`delegate-builder.toml`, `scout.toml`, `researcher.toml`, pinned from the
 `CODEX_*` keys in `roster.conf`) into `~/.codex/agents` as regular files, since
-Codex refuses symlinked agent files. A plain `bin/install` only refreshes the
-agent files it generated earlier; it never creates Codex files or the
-`~/.agents` link.
+Codex refuses symlinked agent files. That skill link is what marks the agent
+files as this clone's: if it is refused or cannot be created, `--codex` renders
+no agent files and exits non-zero. A plain `bin/install` only refreshes the
+agent files it generated earlier, and only when
+`~/.agents/skills/delegate-build` links into the clone it runs from. If
+generated files exist but that link is missing or points at another clone, it
+prints one "not refreshed" row, touches nothing and does not fail; if none
+exist it says nothing. It never creates Codex files or the `~/.agents` link.
 
 ## Update
 
@@ -48,7 +60,8 @@ the symlinks at invocation time, so pulled edits are live immediately (only
 the name and description listings snapshot at session start). The exception
 is the Codex agent files: they are generated copies, so a pulled change to an
 agent body or a `CODEX_*` pin reaches Codex on the next `bin/install`, which
-refreshes the ones it generated earlier. Rerunning `bin/install` also covers a
+refreshes the ones it generated earlier (when `~/.agents/skills/delegate-build`
+links into this clone; see Install). Rerunning `bin/install` also covers a
 pull that introduces a new link; with no Codex agent files to refresh it is a
 no-op otherwise, and it ends with the doctor report.
 
@@ -70,8 +83,10 @@ Reports which tools are installed, which symlinks resolve into this clone, and
 which delegate-build review lanes are live. Run it again after any step below.
 Its optional Codex rows cover the `~/.agents/skills/delegate-build` link and
 each generated agent file, checked whole against `roster.conf` and the
-`agents/*.md` bodies (drift names `bin/install --codex` as the fix), or one row
-saying Codex is not installed.
+`agents/*.md` bodies (drift names `bin/install --codex` as the fix). With
+`codex` on PATH and neither that link nor any generated file, they collapse to
+one row saying delegate-build is not installed for Codex; without `codex` on
+PATH, one row says Codex is not installed.
 `bin/doctor --deep` additionally verifies the OpenCode model slug, which needs
 network. Unmet optional checks are informational: they tell you which lane is
 retired, not that something is broken. The exit status scores only the
@@ -128,24 +143,33 @@ into `~/.codex/agents`. They are generated from the `CODEX_*` keys in
 `roster.conf` plus the bodies of `agents/*.md`, so the instructions have one
 source. Codex refuses symlinked agent files, which is why these are real files,
 refreshed by a plain `bin/install` after a pull (only ones it generated
-earlier; it never creates them). The manual equivalent:
+earlier, and only when `~/.agents/skills/delegate-build` links into the clone
+you run it from; it never creates them). The manual equivalent:
 
     mkdir -p ~/.agents/skills
     ln -s "$REPO/delegate-build" ~/.agents/skills/delegate-build
     "$REPO/bin/roster-render" --codex ~/.codex/agents
 
-`bin/roster-render --codex <dir>` renders into any directory you name, and
-`--claude <dir>` does the same for the four Claude agents, which is how a
-staged run gets pinned copies; add `--check` to verify a directory without
-writing. The agent file format was verified against Codex CLI 0.159.2.
+`bin/roster-render --codex <dir> [--check] [--refresh]` renders into any
+directory you name, and `--claude <dir> [--check]` does the same for the four
+Claude agents, which is how a staged run gets pinned copies; add `--check` to
+verify a directory without writing. A symlink at a target path, or a file the
+renderer did not generate, is an error in a write and in `--check`, and is
+skipped silently under `--refresh`, which only touches files it generated
+(that is what plain `bin/install` runs). The agent file format was verified
+against Codex CLI 0.159.2.
 
 Start the main loop with `codex --sandbox workspace-write --ask-for-approval
-on-request` and invoke the skill as `$delegate-build`; it skips itself on any
-main-loop model other than GPT-6 Astra. Workers inherit the main loop's
-sandbox, so the scout and researcher are read-only by their instructions only.
-[delegate-build/codex.md](delegate-build/codex.md) covers the rest: approvals,
-escalating the Kimi and Claude wrappers out of Codex's sandbox, and why the GPT
-lane is not offered from Codex.
+on-request` and invoke the skill as `$delegate-build`. The main loop must be
+GPT-6 Astra, and it cannot see its own model slug, so unless you named the
+model in the session it asks you to confirm it before announcing; on the
+builders' model or a weaker one it skips itself. Under approval policy `never`
+(or a granular policy with sandbox approvals off) it stops before Phase 1,
+since commits and the lane wrappers need escalation. Workers inherit the main
+loop's sandbox, so the scout and researcher are read-only by their instructions
+only. [delegate-build/codex.md](delegate-build/codex.md) covers the rest:
+approvals, escalating the Kimi and Claude wrappers out of Codex's sandbox, and
+why the GPT lane is not offered from Codex.
 
 ## Optional: status line
 

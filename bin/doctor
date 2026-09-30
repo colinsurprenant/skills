@@ -145,7 +145,23 @@ done
 [ "$stale" = 1 ] || { row "pre-rename links" "$OK" "none"; ok=$((ok+1)); }
 required=0
 check_link "$HOME/.codex/AGENTS.md" AGENT_BEHAVIOR.md "optional: Codex CLI behavior file"
-check_link "$HOME/.agents/skills/delegate-build" delegate-build "optional: delegate-build skill for Codex (bin/install --codex)"
+# delegate-build for Codex is the skill link plus the generated agent files. On
+# a machine with codex but neither (nothing at the link path, and no file
+# bin/roster-render generated in ~/.codex/agents), it was never installed, and
+# one row says so instead of a missing link and three missing files.
+# roster-render --codex --refresh --check prints nothing unless a generated file
+# is there, so any output at all means one is.
+codex_skill="$HOME/.agents/skills/delegate-build"
+codex_unused=0
+if have codex && [ ! -e "$codex_skill" ] && [ ! -L "$codex_skill" ] \
+   && [ -z "$("$repo/bin/roster-render" --codex "$HOME/.codex/agents" --refresh --check 2>&1)" ]; then
+  codex_unused=1
+fi
+if [ "$codex_unused" = 1 ]; then
+  row "delegate-build not installed for Codex" "$NO" "optional: bin/install --codex"; miss
+else
+  check_link "$codex_skill" delegate-build "optional: delegate-build skill for Codex (bin/install --codex)"
+fi
 check_link "$HOME/.config/opencode/AGENTS.md" AGENT_BEHAVIOR.md "optional: OpenCode behavior file"
 check_link "$HOME/.copilot/copilot-instructions.md" AGENT_BEHAVIOR.md "optional: Copilot CLI behavior file"
 
@@ -193,9 +209,12 @@ else
   # (Codex refuses a symlinked agent file), so a roster.conf or agents/*.md
   # edit that never reached ~/.codex/agents shows up here as drift, whole file
   # compared, and bin/install --codex is the fix. Without codex on PATH there
-  # is nothing to verify: one row says so instead.
+  # is nothing to verify: one row says so instead. With codex but nothing
+  # installed for it, the one "not installed" row under Wiring already said so.
   required=0
-  if have codex; then
+  if [ "$codex_unused" = 1 ]; then
+    :
+  elif have codex; then
     codex_rows=0
     while IFS= read -r line; do
       [ -n "$line" ] || continue
@@ -298,15 +317,18 @@ else
   need=""; have opencode || need="opencode"; have srt || need="${need:+$need and }srt"
   row "Kimi (via OpenCode)" "$NO" "needs $need"
 fi
-# The Claude lane bills Anthropic tokens: opt-in per SKILL.md, never part of the
-# no-cost roster the lane count announces.
+# The Claude lane bills Anthropic tokens: opt-in under the skill's lane policy
+# (SKILL.md, and the mechanics file for the harness in use), never part of the
+# no-cost roster the lane count announces. The in-session claude-reviewer agent
+# named in the fallback row is a Claude Code feature; a Codex main loop has no
+# such fallback and simply goes without this lane when srt is missing.
 if [ "$claude_pinned" = 0 ]; then
   row "Claude (sandboxed, opt-in)" "$NO" "$claude_pin"; claude_lane="retired"
 elif have claude && have srt; then
   row "Claude (sandboxed, opt-in)" "$OK" "claude + srt present; $claude_pin"; claude_lane="live"
 else
   need=""; have claude || need="claude"; have srt || need="${need:+$need and }srt"
-  row "Claude (sandboxed, opt-in)" "$NO" "needs $need; in-session claude-reviewer agent still works"; claude_lane="retired"
+  row "Claude (sandboxed, opt-in)" "$NO" "needs $need; in Claude Code the in-session claude-reviewer agent still works"; claude_lane="retired"
 fi
 
 echo

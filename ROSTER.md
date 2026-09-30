@@ -4,10 +4,12 @@ Directives and skills name ROLES. This file explains the roles, the access
 path each one is reached through, and the logic for choosing who fills it.
 It holds no values: every model and effort on this machine lives in
 `roster.conf` at the repo root, the single place they are set. From there
-`bin/roster-render` writes them into `agents/*.md` frontmatter and generates
-the Codex agent files (not committed), and `bin/doctor` verifies the result,
-so swapping a model is an edit to one file plus two commands. Nothing else may
-hardcode a model-to-role assignment.
+`bin/roster-render` writes them into `agents/*.md` frontmatter and, with
+`--codex <dir>`, generates the Codex agent files into a directory (not
+committed), and `bin/doctor` verifies the result. Swapping a Claude model is
+an edit to one file plus two commands; a `CODEX_*` swap also needs
+`bin/install`, which is what puts the generated files into `~/.codex/agents`.
+Nothing else may hardcode a model-to-role assignment.
 
 Three axes, kept apart on purpose:
 
@@ -97,18 +99,24 @@ One surface to edit, two to run, and `bin/install` to deliver the Codex copies:
 - `roster.conf` — the only file you edit. Every model and effort on this
   machine is one line in it.
 - `bin/roster-render` — writes those values into `agents/*.md` frontmatter
-  (`model:`, `effort:`) for the Agent-tool roles. It also generates the Codex
-  agent files (`delegate-builder.toml`, `scout.toml`, `researcher.toml`) from
-  the `CODEX_*` keys and the same `agents/*.md` bodies; they are not
-  committed. `bin/install --codex` writes them into `~/.codex/agents` as regular
-  files (Codex refuses symlinked agent files), and plain `bin/install`
-  refreshes the ones it generated earlier. `--claude <dir>` stages pinned
-  copies of the Claude agents, and `--codex <dir>` the Codex files, into a
-  directory for a staged run.
+  (`model:`, `effort:`) for the Agent-tool roles. `--codex <dir>` generates the
+  Codex agent files (`delegate-builder.toml`, `scout.toml`, `researcher.toml`)
+  from the `CODEX_*` keys and the same `agents/*.md` bodies into the directory
+  you name; they are not committed. `bin/install --codex` writes them into
+  `~/.codex/agents` as regular files (Codex refuses symlinked agent files).
+  Plain `bin/install` refreshes the ones it generated earlier, but only when
+  `~/.agents/skills/delegate-build` links into the clone it runs from; if
+  generated files exist and that link is missing or points elsewhere, it prints
+  one "not refreshed" row, touches nothing and does not fail, and with no
+  generated files it is silent. `--claude <dir>` stages pinned copies of the
+  Claude agents, and `--codex <dir>` the Codex files, into a directory for a
+  staged run.
 - `bin/doctor` — verifies the rendered agents against `roster.conf`, checks the
   review lanes against what is actually installed, and prints the pins each
   lane will use. It also verifies the installed Codex agent files whole (a
   changed body or description is drift, not only a changed model or effort).
+  With `codex` on PATH and neither the skill link nor any generated file, it
+  prints one optional "delegate-build not installed for Codex" row instead.
 
 Nothing parses `roster.conf` itself: `bin/roster-get` is the one reader every
 consumer goes through, so validation, duplicate keys, empty values and error
@@ -122,8 +130,9 @@ invocation. `bin/doctor` reads it too, so doctor itself never names a model.
 Run it after every swap. Prose promises drift; doctor does not.
 
 The Codex agent files are the one exception to run-time reads: they are copies,
-so a `CODEX_*` edit reaches Codex only on the next `bin/install`, and doctor
-reports the drift until then.
+so a `CODEX_*` edit reaches Codex only on the next `bin/install` run from the
+clone that `~/.agents/skills/delegate-build` links into, and doctor reports the
+drift until then.
 
 ## Combo log — the evidence stream
 
@@ -165,8 +174,10 @@ earlier records maps the old names onto the new.
    `roster.conf` and the rendered `agents/*.md` together. Both commands read the
    file through `bin/roster-get`, so a typo in the edit stops the swap at the
    first command with the offending line number rather than half-applying. A
-   `CODEX_*` edit takes effect after `bin/install` from the main checkout
-   (`--codex` the first time), which ends with the doctor report; commit only
-   `roster.conf` for it, since the Codex files are not committed.
+   `CODEX_*` edit takes effect after `bin/install` from the clone that
+   `~/.agents/skills/delegate-build` links into, normally the main checkout
+   (`--codex` the first time); it ends with the doctor report, which shows the
+   Codex files as drift until then. Commit only `roster.conf` for it, since the
+   Codex files are not committed.
 3. Trial period: normal work, combo log accumulating.
 4. Decide against the log's baseline; record the outcome; keep or revert.
