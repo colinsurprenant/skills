@@ -100,7 +100,9 @@ For each changed harness, pull the directives that actually route to it:
 | AGENT_BEHAVIOR.md section | Applies to |
 | --- | --- |
 | `SHARED — all models, all harnesses` | every harness |
-| `MODEL: CLAUDE FABLE/MYTHOS`, `MODEL: CLAUDE OPUS` | Claude Code only |
+| `MODEL: CLAUDE FABLE/MYTHOS` | Claude Code, Fable or Mythos main loop |
+| `MODEL: CLAUDE OPUS` | Claude Code, Opus main loop |
+| `MAIN LOOP: DELEGATION` | Claude Code, Fable, Mythos or Opus main loop |
 | `HARNESS: OUTSIDE CLAUDE CODE` | Codex, OpenCode (and any other non-Claude-Code harness) |
 
 `IDENTITY` is persona, not a behavioral rule competing with a harness prompt —

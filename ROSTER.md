@@ -24,12 +24,18 @@ value itself.
 | Role | Requires | Model | Effort | Access path | Billing |
 | --- | --- | --- | --- | --- | --- |
 | Orchestrator | judgment tier | (session model) | (user's call) | Claude Code main loop | Anthropic |
-| Builder | judgment tier | `$BUILDER_MODEL` | `$BUILDER_EFFORT` | Agent tool `opus-builder` | Anthropic |
+| Builder | volume tier | `$BUILDER_MODEL` | `$BUILDER_EFFORT` | Agent tool `opus-builder` | Anthropic |
 | Researcher / validator | judgment tier | `$RESEARCHER_MODEL` | `$RESEARCHER_EFFORT` | Agent tool `researcher` | Anthropic |
 | Scout | volume tier | `$SCOUT_MODEL` | (inherited) | Explore / general-purpose with the scout model override | Anthropic |
 
 The Orchestrator row is the session you are already in: its model is chosen at
 launch, not set anywhere in this repo, which is why it has no key.
+
+Tier follows the picker in `AGENT_BEHAVIOR.md`: will anyone act on the output
+unchecked? The Builder is volume tier because no build order's output is acted
+on unchecked: the orchestrator reviews each report, the lanes review the diff,
+and triage closes what they find. Effort is still set per role, which is how a
+volume-tier builder can run higher than the scout.
 
 Reviewer portfolio (a set, not a slot — see Selection logic):
 

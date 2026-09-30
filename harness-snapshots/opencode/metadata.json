@@ -1,5 +1,5 @@
 {
-  "commit": "127bdb30784d508cc556c71a0f32b508a3061517",
+  "commit": "3104c1428ec91f809e5ab86631300de41eb6952e",
   "files": [
     {
       "bytes": 8212,
@@ -37,6 +37,11 @@
       "sha256": "921750803b0314b88b8adc996e2afcf1a61fd7d9dd6dfcf812baeadac1468cf3"
     },
     {
+      "bytes": 4078,
+      "file": "gpt-astra.txt",
+      "sha256": "46d386ea8dd8db5734d06f6ec1d04c566f1224b1afa5bc5b0ccefd6f853281f9"
+    },
+    {
       "bytes": 9284,
       "file": "gpt.txt",
       "sha256": "83a66a46a5febbc21454161d5f053638b22d25d95e09d77b8f6da33debc848ad"
@@ -47,9 +52,9 @@
       "sha256": "ade9199b00df5aa3b51bb02b8e8c711f3e0de224345aef7df9f31d3ea08a5bc7"
     },
     {
-      "bytes": 8347,
+      "bytes": 9159,
       "file": "meta.txt",
-      "sha256": "9c5323f076a032f305386bfab3220a764f90489e9fa2a4c4796bffe031ce03e8"
+      "sha256": "9068607ce8bbb3f9b09531d8114fc16e1724de96cd1e364565c9f6f6b2b61df3"
     },
     {
       "bytes": 4547,
@@ -72,7 +77,7 @@
       "sha256": "0019dc1d018d08c1b5a065d10896e22d2615d33580088f44aefc3a042a46ebe2"
     }
   ],
-  "ref": "v1.18.3",
+  "ref": "v1.18.30",
   "repo": "anomalyco/opencode",
-  "version": "1.18.3"
+  "version": "1.18.30"
 }

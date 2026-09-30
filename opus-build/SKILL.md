@@ -123,7 +123,7 @@ reads of the lines it names, never the whole diff (measured in M8 to hold).
   under the same obligations an order would carry: the step 4 gate when it
   changes protocol, trust, or spec prose; the restatement sweep; and the
   verification the order would have named.
-- Anything larger: a narrow fix order to Opus; don't absorb build work here. A
+- Anything larger: a narrow fix order to `opus-builder`; don't absorb build work here. A
   fix order has the full Phase 1 shape, **Touches** included, scoped to the
   findings it fixes, and takes the step 4 gate when the fix changes protocol,
   trust, or spec prose. A builder-reported blocker on an editable out-of-scope
@@ -220,7 +220,7 @@ name what makes the change low-stakes (size, blast radius, reversibility).
 ## Phase 5 — Triage and close (here, on the main loop)
 
 Adjudicate every lane's findings together (expect noise), dispatch the accepted
-fixes to Opus as cycle one (one fix order, or a few that don't overlap), commit
+fixes to `opus-builder` as cycle one (one fix order, or a few that don't overlap), commit
 the fix tree, and announce the base (the breadth head) and the new head.
 
 Then run ONE confirming pass: only the lanes whose findings were accepted,
