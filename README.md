@@ -13,8 +13,9 @@ hardcoded paths. The persona is mine: fork and edit.
 
 To update later: `git pull`, then `bin/install` again. Pulled edits to
 skills and agents land live through the symlinks; the rerun exists only to
-create links a pull introduced, is a no-op otherwise, and ends with the
-doctor report either way.
+create links a pull introduced (and to drop the pre-rename `opus-build`,
+`opus-builder` and `opus-reviewer` links if you have them), is a no-op
+otherwise, and ends with the doctor report either way.
 
 ## What's here
 
@@ -53,22 +54,27 @@ so they're snapshotted, diffed, and the file is audited against them.
 
 A long build outgrows one context window, so the build loop is split:
 judgment (planning, review) stays hot on the main loop, implementation
-volume goes to fresh Opus builders, and breadth review runs on external
-harnesses, under OS-level confinement (see Sandboxing).
+volume goes to fresh builders at the roster's pinned model and effort, and
+breadth review runs on external harnesses, under OS-level confinement (see
+Sandboxing).
 
-- **[opus-build/](opus-build/SKILL.md)**: the split build workflow, invoked
-  explicitly for builds that span more than one session. Plan and review on
-  the main loop, build on fresh Opus subagents at the effort pinned in
-  roster.conf, breadth-review on whichever external lanes are installed
-  (Codex, Kimi K3, a sandboxed Opus). The split buys context continuity, not
-  a token saving: measured on a one-session task, it cost more than a solo
-  run for equal quality.
-  [review-2026-07-27.md](opus-build/review-2026-07-27.md) is the
-  adversarial review from its first validation run;
-  [sandbox/](opus-build/sandbox/) confines the headless review lanes.
-- **[agents/opus-builder.md](agents/opus-builder.md)** and
-  **[agents/opus-reviewer.md](agents/opus-reviewer.md)**: the pinned-model
-  build and review agents it dispatches to.
+- **[delegate-build/](delegate-build/SKILL.md)**: the split build workflow,
+  invoked explicitly for builds that span more than one session. Plan and
+  review on the main loop, build on fresh subagents at the model and effort
+  pinned in roster.conf, breadth-review on whichever external lanes are
+  installed (a GPT lane through Codex, a Kimi lane through OpenCode, a
+  sandboxed Claude lane). Lanes are named by model family, since the model
+  inside a lane and its access path both change. The split buys context
+  continuity, not a token saving: measured on a one-session task, it cost
+  more than a solo run for equal quality.
+  [review-2026-07-27.md](delegate-build/review-2026-07-27.md) is the
+  adversarial review from its first validation run (written when the skill
+  was still named opus-build);
+  [sandbox/](delegate-build/sandbox/) confines the headless review lanes.
+- **[agents/delegate-builder.md](agents/delegate-builder.md)**,
+  **[agents/claude-reviewer.md](agents/claude-reviewer.md)** and
+  **[agents/scout.md](agents/scout.md)**: the pinned-model build, review and
+  scouting agents it dispatches to.
 - **[commands/iterate.md](commands/iterate.md)**: the discovery-driven loop
   for fuzzy-scope work (frame, build, evaluate, decide). Its premise: in
   discovery work the spec is an output, written at convergence rather than
@@ -86,25 +92,25 @@ harnesses, under OS-level confinement (see Sandboxing).
 Agents here run under OS-level confinement (macOS Seatbelt), scoped by trust
 and supervision rather than model goodwill:
 
-- The opus-build **K3 reviewer**, an open-weight model running headless
+- The delegate-build **Kimi reviewer**, an open-weight model running headless
   through OpenCode (which has no OS sandbox of its own), is wrapped in
   Anthropic's [`@anthropic-ai/sandbox-runtime`](https://www.npmjs.com/package/@anthropic-ai/sandbox-runtime)
-  by [opus-build/sandbox/k3-review.sh](opus-build/sandbox/k3-review.sh):
+  by [delegate-build/sandbox/kimi-review.sh](delegate-build/sandbox/kimi-review.sh):
   repo readable but not writable, writes confined to OpenCode's own state
   dirs and temp space, network confined to the Kimi API. Fails closed when
   srt is missing rather than degrading to an unsandboxed run.
-- The **Codex reviewer** is OS-sandboxed read-only by its plugin's own
-  default, pinned in the opus-build skill so a plugin update that widens
-  that default gets surfaced, not silently absorbed. The lane is the
-  plugin's `/codex:rescue` command, shipped by OpenAI rather than defined
-  here; its dedicated review commands are user-invocable only, so the skill
-  frames the rescue agent as review-only by prompt.
-- The **Opus reviewer** gets the same treatment by
-  [opus-build/sandbox/opus-review.sh](opus-build/sandbox/opus-review.sh),
-  which is the standard Phase 4 Opus path. Sandboxing a reviewer while build
+- The **GPT reviewer**, reached through Codex, is OS-sandboxed read-only by
+  its plugin's own default, pinned in the delegate-build skill so a plugin
+  update that widens that default gets surfaced, not silently absorbed. The
+  lane is the plugin's `/codex:rescue` command, shipped by OpenAI rather than
+  defined here; its dedicated review commands are user-invocable only, so the
+  skill frames the rescue agent as review-only by prompt.
+- The **Claude reviewer** gets the same treatment by
+  [delegate-build/sandbox/claude-review.sh](delegate-build/sandbox/claude-review.sh),
+  which is the standard Phase 4 Claude path. Sandboxing a reviewer while build
   subagents write files unsandboxed sounds inconsistent, but it is just least
   privilege: builders need write access to do the job and reviewers never do.
-- **Everything else**, the main loop and Opus build subagents included, runs
+- **Everything else**, the main loop and the build subagents included, runs
   with Claude Code's own permission prompts. Its native Bash sandbox is
   available and documented in [SETUP.md](SETUP.md), but it is opt-in and off
   in my settings: it trades prompts for a boundary, which pays off only when

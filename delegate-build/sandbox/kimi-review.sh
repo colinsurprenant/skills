@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Sandboxed K3 review lane for opus-build Phase 4.
+# Sandboxed Kimi review lane for delegate-build Phase 4.
 # Wraps `opencode run` (model pinned from roster.conf) in srt
 # (@anthropic-ai/sandbox-runtime):
 # writes are confined to OpenCode's own state dirs + temp space, network to the
@@ -7,24 +7,26 @@
 # stays readable but not writable —
 # OpenCode has no OS-level sandbox of its own, and this lane runs an open-weight
 # model headless, so the boundary must be mechanical, not model judgment.
+# The lane is named for the model family; the pinned model and the provider
+# path behind it are roster.conf's to change.
 set -euo pipefail
 
 dry_run=""
 if [ "${1-}" = "--dry-run" ]; then dry_run=1; shift; fi
 
-[ $# -eq 1 ] || { echo "usage: k3-review.sh [--dry-run] \"<review prompt>\"" >&2; exit 2; }
+[ $# -eq 1 ] || { echo "usage: kimi-review.sh [--dry-run] \"<review prompt>\"" >&2; exit 2; }
 
 # --dry-run assembles and prints the command without running it, so the pin
 # can be verified on a machine that has no sandbox runtime installed.
 if [ -z "$dry_run" ] && ! command -v srt >/dev/null 2>&1; then
-  echo "k3-review: srt not found — install: npm i -g @anthropic-ai/sandbox-runtime" >&2
-  echo "k3-review: refusing to run the K3 reviewer unsandboxed" >&2
+  echo "kimi-review: srt not found — install: npm i -g @anthropic-ai/sandbox-runtime" >&2
+  echo "kimi-review: refusing to run the Kimi reviewer unsandboxed" >&2
   exit 127
 fi
 
 # Resolve the script dir physically FIRST, then walk up: `dirname $0/../..`
 # would be canonicalized textually against the logical path and land in
-# ~/.claude/skills when this runs through the ~/.claude/skills/opus-build
+# ~/.claude/skills when this runs through the ~/.claude/skills/delegate-build
 # symlink. Two steps, both -P, reach the real repo root either way.
 dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 root="$(cd "$dir/../.." && pwd -P)"
@@ -37,18 +39,18 @@ root="$(cd "$dir/../.." && pwd -P)"
 # config fault reads the same from every lane.
 reader="$root/bin/roster-get"
 [ -x "$reader" ] || {
-  echo "k3-review: roster reader not found or not executable at $reader" >&2
+  echo "kimi-review: roster reader not found or not executable at $reader" >&2
   exit 78
 }
 
-k3_model="$("$reader" K3_MODEL)" || exit 78
-# K3_VARIANT is the provider-specific reasoning effort. The key must be present
+kimi_model="$("$reader" KIMI_REVIEWER_MODEL)" || exit 78
+# KIMI_REVIEWER_VARIANT is the provider-specific reasoning effort. The key must be present
 # — an absent key is a config fault like any other — but an empty value is a
 # real setting: omit the flag and take the provider default.
-k3_variant="$("$reader" K3_VARIANT)" || exit 78
+kimi_variant="$("$reader" KIMI_REVIEWER_VARIANT)" || exit 78
 variant_arg=""
-if [ -n "$k3_variant" ]; then
-  variant_arg=" --variant $(printf '%q' "$k3_variant")"
+if [ -n "$kimi_variant" ]; then
+  variant_arg=" --variant $(printf '%q' "$kimi_variant")"
 fi
 
 # Director is my separate session-coordination CLI, not part of this repo. If you
@@ -59,7 +61,7 @@ fi
 #      plugin and the CC shims honor: sole resolution candidate, non-executable,
 #      so every hook degrades to a no-op. No digest injection, no fleet rows —
 #      the reviewer never hears about Director at all.
-#   2. The preamble below — covers what the kill switch can't: K3 reading
+#   2. The preamble below — covers what the kill switch can't: Kimi reading
 #      about the director CLI in ambient repo docs and trying it anyway.
 # Deliver the verdict on stdout; the orchestrating session records it. Stdout
 # is also tee'd to a temp report file (path announced on stderr at launch) so a
@@ -77,11 +79,11 @@ verdict as your final message — the session that launched you records it."
 # literal $'...' through as the prompt — the reviewer would then review against
 # a garbled brief and still return a plausible-looking report. srt forwards the
 # environment to the sandboxed command (verified with these settings), so plain
-# POSIX $VAR expansion suffices. Same mechanism as the Opus lane.
-export K3_REVIEW_PROMPT="$preamble $1"
+# POSIX $VAR expansion suffices. Same mechanism as the Claude lane.
+export KIMI_REVIEW_PROMPT="$preamble $1"
 
-# \$K3_REVIEW_PROMPT is escaped so the INNER shell expands it, not this one.
-cmd="DIRECTOR_BIN=/dev/null opencode run -m $(printf '%q' "$k3_model")$variant_arg \"\$K3_REVIEW_PROMPT\""
+# \$KIMI_REVIEW_PROMPT is escaped so the INNER shell expands it, not this one.
+cmd="DIRECTOR_BIN=/dev/null opencode run -m $(printf '%q' "$kimi_model")$variant_arg \"\$KIMI_REVIEW_PROMPT\""
 
 if [ -n "$dry_run" ]; then
   printf '%s\n' "$cmd"
@@ -90,8 +92,8 @@ fi
 
 # mktemp, not a hand-built name: a predictable path under world-writable /tmp
 # is a symlink-attack target; mktemp creates the file itself, 0600.
-report="$(mktemp "${TMPDIR:-/tmp}/k3-review-XXXXXX")"
-echo "k3-review: tee'ing report to $report" >&2
+report="$(mktemp "${TMPDIR:-/tmp}/kimi-review-XXXXXX")"
+echo "kimi-review: tee'ing report to $report" >&2
 
 # No exec: the pipeline needs this shell. pipefail propagates srt's status.
-srt --settings "$dir/srt-settings.json" -c "$cmd" < /dev/null | tee "$report"
+srt --settings "$dir/kimi-srt-settings.json" -c "$cmd" < /dev/null | tee "$report"

@@ -39,15 +39,36 @@ links_to() { # links_to <link> <absolute expected target>
   [ "$(cd "$(dirname "$t")" 2>/dev/null && pwd -P)/$(basename "$t")" = "$2" ]
 }
 
+# True if <link> is a symlink naming exactly "$repo/<old target>", the path a
+# pre-rename install created. That target is dangling by construction, so only
+# its directory is resolved, physically; a link whose directory does not
+# resolve, or that names anything else (another clone, a live file in this one,
+# a `..` escape), is not ours. Same test as bin/install's migration.
+is_pre_rename_link() { # is_pre_rename_link <link> <repo-relative old target>
+  local t d
+  [ -L "$1" ] || return 1
+  t="$(readlink "$1")"
+  case "$t" in
+    /*) ;;
+    *) d="$(CDPATH='' cd -P -- "$(dirname "$1")" 2>/dev/null && pwd -P)" || return 1
+       t="$d/$t" ;;
+  esac
+  d="$(CDPATH='' cd -P -- "$(dirname "$t")" 2>/dev/null && pwd -P)" || return 1
+  [ "$d/$(basename "$t")" = "$repo/$2" ]
+}
+
 check_cmd() {
   if have "$2"; then row "$1" "$OK" "$(command -v "$2")"; ok=$((ok+1)); return 0
   else row "$1" "$NO" "${3:-not installed}"; miss; return 1; fi
 }
 
+# The ~ goes through a variable: bash 5 tilde-expands a literal ~ in the
+# replacement back to $HOME, and bash 3.2 keeps a backslash-escaped one.
+tilde='~'
 check_link() { # check_link <path> <repo-relative expected target> [missing-note]
-  if links_to "$1" "$repo/$2"; then row "${1/#$HOME/~}" "$OK"; ok=$((ok+1)); return 0
-  elif [ -e "$1" ] || [ -L "$1" ]; then row "${1/#$HOME/~}" "$NO" "exists but is not a link to $2"; miss; return 1
-  else row "${1/#$HOME/~}" "$NO" "${3:-not linked}"; miss; return 1; fi
+  if links_to "$1" "$repo/$2"; then row "${1/#$HOME/$tilde}" "$OK"; ok=$((ok+1)); return 0
+  elif [ -e "$1" ] || [ -L "$1" ]; then row "${1/#$HOME/$tilde}" "$NO" "exists but is not a link to $2"; miss; return 1
+  else row "${1/#$HOME/$tilde}" "$NO" "${3:-not linked}"; miss; return 1; fi
 }
 
 # bin/roster-get is the one reader of roster.conf — the same one bin/roster-render
@@ -101,11 +122,26 @@ check_link "$HOME/.claude/CLAUDE.md" CLAUDE.global.md "behavior file will not lo
 echo
 echo "Wiring — symlinks into this clone"
 check_link "$HOME/.claude/skills/audit-directives" audit-directives
-check_link "$HOME/.claude/skills/opus-build" opus-build
-check_link "$HOME/.claude/agents/opus-builder.md" agents/opus-builder.md
-check_link "$HOME/.claude/agents/opus-reviewer.md" agents/opus-reviewer.md
+check_link "$HOME/.claude/skills/delegate-build" delegate-build
+check_link "$HOME/.claude/agents/delegate-builder.md" agents/delegate-builder.md
+check_link "$HOME/.claude/agents/claude-reviewer.md" agents/claude-reviewer.md
 check_link "$HOME/.claude/agents/researcher.md" agents/researcher.md
+check_link "$HOME/.claude/agents/scout.md" agents/scout.md
 check_link "$HOME/.claude/commands/iterate.md" commands/iterate.md
+# Links from before the delegate-build rename. One that still names its old
+# target in this clone is stale: that target is gone, and the link keeps the old
+# name listed. Anything else at those paths is not ours, and bin/install leaves
+# it alone too. A clean state is one summary row, a stale link is one row each.
+stale=0
+for pair in skills/opus-build:opus-build \
+            agents/opus-builder.md:agents/opus-builder.md \
+            agents/opus-reviewer.md:agents/opus-reviewer.md; do
+  old_link="$HOME/.claude/${pair%%:*}"
+  if is_pre_rename_link "$old_link" "${pair#*:}"; then
+    row "${old_link/#$HOME/$tilde}" "$NO" "stale pre-rename link; run bin/install"; miss; stale=1
+  fi
+done
+[ "$stale" = 1 ] || { row "pre-rename links" "$OK" "none"; ok=$((ok+1)); }
 required=0
 check_link "$HOME/.codex/AGENTS.md" AGENT_BEHAVIOR.md "optional: Codex CLI behavior file"
 check_link "$HOME/.config/opencode/AGENTS.md" AGENT_BEHAVIOR.md "optional: OpenCode behavior file"
@@ -116,7 +152,7 @@ echo "roster.conf — every model and effort on this machine"
 # roster.conf is the single place a value is set; this section keeps the
 # surfaces it feeds honest. The agent rows come from bin/roster-render --check,
 # which owns the role-to-file mapping; the lane rows echo the pins the
-# opus-build wrappers read, so a swap that missed a wrapper shows up here.
+# delegate-build wrappers read, so a swap that missed a wrapper shows up here.
 required=1
 if [ ! -f "$repo/roster.conf" ]; then
   row "roster.conf" "$NO" "missing; nothing binds a role to a model"; miss
@@ -151,10 +187,9 @@ else
 
   # Lane pins: informational, and optional the way the lanes themselves are.
   required=0
-  pin_row "Scout" SCOUT_MODEL
-  pin_row "Codex lane" CODEX_MODEL CODEX_EFFORT
-  pin_row "Kimi K3 lane" K3_MODEL K3_VARIANT
-  pin_row "Opus review lane" OPUS_REVIEWER_MODEL OPUS_REVIEWER_EFFORT
+  pin_row "GPT lane" GPT_REVIEWER_MODEL GPT_REVIEWER_EFFORT
+  pin_row "Kimi lane" KIMI_REVIEWER_MODEL KIMI_REVIEWER_VARIANT
+  pin_row "Claude lane" CLAUDE_REVIEWER_MODEL CLAUDE_REVIEWER_EFFORT
 fi
 required=0
 
@@ -178,75 +213,75 @@ else
 fi
 
 echo
-echo "opus-build Phase 4 review lanes"
+echo "delegate-build Phase 4 review lanes"
 lanes=0
 # Every pin below comes from the same one reader. A file-level fault was already
 # reported once in the roster section, so these rows defer to it instead of
 # repeating it three times — and never claim a key is unset when the file is.
 pin_fault="pin unknown: see the roster.conf row above"
-codex_pin="$pin_fault"; k3_model=""; k3_pin="$pin_fault"; opus_pin="$pin_fault"
+gpt_pin="$pin_fault"; kimi_model=""; kimi_pin="$pin_fault"; claude_pin="$pin_fault"
 # A lane is live only if every pin behind it was read: tooling that is present
 # but aimed at an unknown model is not a working lane, so an unread pin makes
 # the row NO and keeps the lane out of the count, whatever the tooling says.
-codex_pinned=0; k3_pinned=0; opus_pinned=0
+gpt_pinned=0; kimi_pinned=0; claude_pinned=0
 if [ "$roster_broken" = 0 ]; then
-  codex_pinned=1; k3_pinned=1; opus_pinned=1
-  if roster_read CODEX_MODEL; then codex_pin="$roster_val"; else codex_pin="$roster_err"; codex_pinned=0; fi
-  if roster_read CODEX_EFFORT; then codex_pin="$codex_pin${roster_val:+, $roster_val}"
-  else codex_pin="$codex_pin; $roster_err"; codex_pinned=0; fi
-  if roster_read K3_MODEL; then
-    k3_model="$roster_val"; k3_pin="$k3_model"
-    if roster_read K3_VARIANT; then k3_pin="$k3_pin${roster_val:+, variant $roster_val}"
-    else k3_pin="$k3_pin; $roster_err"; k3_pinned=0; fi
+  gpt_pinned=1; kimi_pinned=1; claude_pinned=1
+  if roster_read GPT_REVIEWER_MODEL; then gpt_pin="$roster_val"; else gpt_pin="$roster_err"; gpt_pinned=0; fi
+  if roster_read GPT_REVIEWER_EFFORT; then gpt_pin="$gpt_pin${roster_val:+, $roster_val}"
+  else gpt_pin="$gpt_pin; $roster_err"; gpt_pinned=0; fi
+  if roster_read KIMI_REVIEWER_MODEL; then
+    kimi_model="$roster_val"; kimi_pin="$kimi_model"
+    if roster_read KIMI_REVIEWER_VARIANT; then kimi_pin="$kimi_pin${roster_val:+, variant $roster_val}"
+    else kimi_pin="$kimi_pin; $roster_err"; kimi_pinned=0; fi
   else
-    k3_pin="$roster_err"; k3_pinned=0
+    kimi_pin="$roster_err"; kimi_pinned=0
   fi
-  if roster_read OPUS_REVIEWER_MODEL; then opus_pin="$roster_val"; else opus_pin="$roster_err"; opus_pinned=0; fi
-  if roster_read OPUS_REVIEWER_EFFORT; then opus_pin="$opus_pin${roster_val:+, $roster_val}"
-  else opus_pin="$opus_pin; $roster_err"; opus_pinned=0; fi
+  if roster_read CLAUDE_REVIEWER_MODEL; then claude_pin="$roster_val"; else claude_pin="$roster_err"; claude_pinned=0; fi
+  if roster_read CLAUDE_REVIEWER_EFFORT; then claude_pin="$claude_pin${roster_val:+, $roster_val}"
+  else claude_pin="$claude_pin; $roster_err"; claude_pinned=0; fi
 fi
-if [ "$codex_pinned" = 0 ]; then
-  row "Codex" "$NO" "$codex_pin"
+if [ "$gpt_pinned" = 0 ]; then
+  row "GPT (via Codex)" "$NO" "$gpt_pin"
 elif grep -q "codex@openai-codex" "$HOME/.claude/plugins/installed_plugins.json" 2>/dev/null; then
-  row "Codex" "$OK" "codex plugin installed; $codex_pin"; lanes=$((lanes+1))
+  row "GPT (via Codex)" "$OK" "codex plugin installed; $gpt_pin"; lanes=$((lanes+1))
 else
-  row "Codex" "$NO" "install the openai/codex-plugin-cc plugin; $codex_pin"
+  row "GPT (via Codex)" "$NO" "install the openai/codex-plugin-cc plugin; $gpt_pin"
 fi
-if [ "$k3_pinned" = 0 ] || [ -z "$k3_model" ]; then
-  row "Kimi K3" "$NO" "$k3_pin"
+if [ "$kimi_pinned" = 0 ] || [ -z "$kimi_model" ]; then
+  row "Kimi (via OpenCode)" "$NO" "$kimi_pin"
 elif have opencode && have srt; then
   if [ "$deep" = 1 ]; then
     # -x -F --: the pin is a literal to match whole-line, not a regex; a slug
     # with a '.' or a '+' in it would otherwise match the wrong catalog entry.
-    if opencode models 2>/dev/null | grep -qxF -- "$k3_model"; then
-      row "Kimi K3" "$OK" "$k3_pin available"; lanes=$((lanes+1))
+    if opencode models 2>/dev/null | grep -qxF -- "$kimi_model"; then
+      row "Kimi (via OpenCode)" "$OK" "$kimi_pin available"; lanes=$((lanes+1))
     else
-      row "Kimi K3" "$NO" "$k3_model not in 'opencode models'"
+      row "Kimi (via OpenCode)" "$NO" "$kimi_model not in 'opencode models'"
     fi
   else
-    row "Kimi K3" "$OK" "opencode + srt present; $k3_pin unverified (--deep to check)"; lanes=$((lanes+1))
+    row "Kimi (via OpenCode)" "$OK" "opencode + srt present; $kimi_pin unverified (--deep to check)"; lanes=$((lanes+1))
   fi
 else
   need=""; have opencode || need="opencode"; have srt || need="${need:+$need and }srt"
-  row "Kimi K3" "$NO" "needs $need"
+  row "Kimi (via OpenCode)" "$NO" "needs $need"
 fi
-# Opus bills Anthropic tokens: opt-in per SKILL.md, never part of the
+# The Claude lane bills Anthropic tokens: opt-in per SKILL.md, never part of the
 # no-cost roster the lane count announces.
-if [ "$opus_pinned" = 0 ]; then
-  row "Opus (sandboxed, opt-in)" "$NO" "$opus_pin"; opus_lane="retired"
+if [ "$claude_pinned" = 0 ]; then
+  row "Claude (sandboxed, opt-in)" "$NO" "$claude_pin"; claude_lane="retired"
 elif have claude && have srt; then
-  row "Opus (sandboxed, opt-in)" "$OK" "claude + srt present; $opus_pin"; opus_lane="live"
+  row "Claude (sandboxed, opt-in)" "$OK" "claude + srt present; $claude_pin"; claude_lane="live"
 else
   need=""; have claude || need="claude"; have srt || need="${need:+$need and }srt"
-  row "Opus (sandboxed, opt-in)" "$NO" "needs $need; in-session opus-reviewer agent still works"; opus_lane="retired"
+  row "Claude (sandboxed, opt-in)" "$NO" "needs $need; in-session claude-reviewer agent still works"; claude_lane="retired"
 fi
 
 echo
 if [ "$req_missing" -eq 0 ]; then
-  echo "$lanes of 2 no-cost review lanes live, Opus opt-in lane $opus_lane; $ok checks ok, $opt_missing optional unmet."
+  echo "$lanes of 2 no-cost review lanes live, Claude opt-in lane $claude_lane; $ok checks ok, $opt_missing optional unmet."
   echo "Unmet optional checks are fine — they retire a lane, they do not break the rest."
 else
-  echo "$lanes of 2 no-cost review lanes live, Opus opt-in lane $opus_lane; $ok checks ok, $req_missing REQUIRED unmet, $opt_missing optional unmet."
+  echo "$lanes of 2 no-cost review lanes live, Claude opt-in lane $claude_lane; $ok checks ok, $req_missing REQUIRED unmet, $opt_missing optional unmet."
   echo "Fix the required checks (SETUP.md, Required: Claude Code); optional ones only retire lanes."
 fi
 echo "Models and efforts: roster.conf (agent frontmatter and lane pins verified above)."

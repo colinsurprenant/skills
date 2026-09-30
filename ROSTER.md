@@ -24,9 +24,9 @@ value itself.
 | Role | Requires | Model | Effort | Access path | Billing |
 | --- | --- | --- | --- | --- | --- |
 | Orchestrator | judgment tier | (session model) | (user's call) | Claude Code main loop | Anthropic |
-| Builder | volume tier | `$BUILDER_MODEL` | `$BUILDER_EFFORT` | Agent tool `opus-builder` | Anthropic |
+| Builder | volume tier | `$BUILDER_MODEL` | `$BUILDER_EFFORT` | Agent tool `delegate-builder` | Anthropic |
 | Researcher / validator | judgment tier | `$RESEARCHER_MODEL` | `$RESEARCHER_EFFORT` | Agent tool `researcher` | Anthropic |
-| Scout | volume tier | `$SCOUT_MODEL` | (inherited) | Explore / general-purpose with the scout model override | Anthropic |
+| Scout | volume tier | `$SCOUT_MODEL` | `$SCOUT_EFFORT` | Agent tool `scout` | Anthropic |
 
 The Orchestrator row is the session you are already in: its model is chosen at
 launch, not set anywhere in this repo, which is why it has no key.
@@ -41,12 +41,18 @@ Reviewer portfolio (a set, not a slot — see Selection logic):
 
 | Lane | Model @ effort | Access path | Billing |
 | --- | --- | --- | --- |
-| Codex | `$CODEX_MODEL` @ `$CODEX_EFFORT` | Codex CLI (`/codex:rescue`) | ChatGPT plan |
-| Kimi K3 | `$K3_MODEL` @ `$K3_VARIANT` | opencode + srt sandbox | Moonshot |
-| Opus (opt-in) | `$OPUS_REVIEWER_MODEL` @ `$OPUS_REVIEWER_EFFORT` | sandboxed claude, or in-session `opus-reviewer` | Anthropic |
+| GPT | `$GPT_REVIEWER_MODEL` @ `$GPT_REVIEWER_EFFORT` | Codex CLI (`/codex:rescue`) | ChatGPT plan |
+| Kimi | `$KIMI_REVIEWER_MODEL` @ `$KIMI_REVIEWER_VARIANT` | opencode + srt sandbox | Moonshot |
+| Claude (opt-in) | `$CLAUDE_REVIEWER_MODEL` @ `$CLAUDE_REVIEWER_EFFORT` | sandboxed claude, or in-session `claude-reviewer` | Anthropic |
 | Escalation | /code-review ultra | Claude cloud | Anthropic |
 
-`$K3_VARIANT` is opencode's provider-specific reasoning effort and may be
+Lanes are named by lineage, never by the model inside or the access path,
+because the portfolio is diversity by lineage and both of those churn. The
+lane of the orchestrator's own lineage is opt-in: it adds the least diversity
+to a review of that orchestrator's builders' work, and it bills the same quota
+the orchestrator runs on.
+
+`$KIMI_REVIEWER_VARIANT` is opencode's provider-specific reasoning effort and may be
 empty, which means take the provider default. What value form each key accepts
 — alias, full model id, provider slug, effort level — is documented per key in
 `roster.conf`, along with the policy behind it: the Anthropic keys hold aliases
@@ -61,10 +67,11 @@ cycles) or spot-check pass rate (researcher).
 
 The reviewer portfolio is diversity-driven: its value is that different
 training lineages fail differently. Compose it for lineage coverage at
-bounded cost, not by ranking capability. Current lineages: Anthropic,
-OpenAI, Moonshot. A candidate lane earns a slot by unique catches (accepted
-findings no other lane caught), not by hit rate alone; a lane whose accepted
-findings duplicate another lane's is redundant however accurate it is.
+bounded cost, not by ranking capability. Current lineages: Anthropic
+(Claude), OpenAI (GPT), Moonshot (Kimi). A candidate lane earns a slot by
+unique catches (accepted findings no other lane caught), not by hit rate
+alone; a lane whose accepted findings duplicate another lane's is redundant
+however accurate it is.
 
 ## Binding surfaces
 
@@ -84,8 +91,8 @@ text have a single definition and a broken roster fails identically in
 roster-render, doctor and both review wrappers.
 
 Everything else reads `roster.conf` at run time and needs no sync: the
-opus-build Codex lane resolves it through the skill symlink before dispatching
-`/codex:rescue`, and both `opus-build/sandbox/*.sh` wrappers read it on every
+delegate-build GPT lane resolves it through the skill symlink before dispatching
+`/codex:rescue`, and both `delegate-build/sandbox/*.sh` wrappers read it on every
 invocation. `bin/doctor` reads it too, so doctor itself never names a model.
 Run it after every swap. Prose promises drift; doctor does not.
 
@@ -95,7 +102,7 @@ Roster decisions run on recorded outcomes, not memory. Capture is
 unconditional; analysis is on demand (a `researcher` dispatch over the log
 when a decision needs it).
 
-Emit one note per opus-build run at Phase 5 close, and one for any notable
+Emit one note per delegate-build run at Phase 5 close, and one for any notable
 singleton outcome (a bounced work order, a researcher spot-check result):
 
     director emit --type note --area combo-log "<task>: build=<model> orders=<n> bounced=<n> fix_cycles=<n>; lane <name>: submitted=<n> accepted=<n> rejected=<n> unique=<n>; lane <name>: ...; skips=<lane:kind|none>; note=<one line>"
@@ -115,6 +122,9 @@ one pass batch into it. Phase 3 fix orders issued before the breadth pass are
 not fix cycles; they count in `bounced`. A deferred follow-up, and any lane
 round the user asks for past the bound, go in `note=`. This definition of
 `fix_cycles` changed 2026-09-28, so earlier records are not comparable on it.
+Lane names changed 2026-09-30 (codex to gpt, k3 to kimi, opus to claude), and
+the workflow's name with them (opus-build to delegate-build); analysis over
+earlier records maps the old names onto the new.
 
 ## Swap procedure
 

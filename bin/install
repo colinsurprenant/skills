@@ -2,6 +2,8 @@
 # Creates the symlinks SETUP.md documents: the required Claude Code set by
 # default, the optional harness links by flag. Renders agents/*.md frontmatter
 # from roster.conf first, so the links land on current files.
+# Before linking, removes links left by the delegate-build rename (opus-build,
+# opus-builder, opus-reviewer) that still name their old target in this clone.
 # Idempotent and non-clobbering:
 # a link already resolving into this clone is left alone, and anything else
 # occupying a target path is reported, never replaced. Finishes by running
@@ -24,9 +26,12 @@ for arg in "$@"; do
   esac
 done
 
-made=0; kept=0; refused=0; render_failed=0
+made=0; kept=0; removed=0; refused=0; render_failed=0
 OK="  ok  "; NO="  --  "
-row() { printf '  %-44s %s %s\n' "${1/#$HOME/~}" "$2" "${3:-}"; }
+# The ~ goes through a variable: bash 5 tilde-expands a literal ~ in the
+# replacement back to $HOME, and bash 3.2 keeps a backslash-escaped one.
+tilde='~'
+row() { printf '  %-44s %s %s\n' "${1/#$HOME/$tilde}" "$2" "${3:-}"; }
 
 # Stricter than doctor's into-this-clone test: a link counts only if it
 # resolves to exactly the documented source. A link to some other file,
@@ -37,6 +42,46 @@ links_to() { # links_to <link> <absolute expected source>
   t="$(readlink "$1")"
   case "$t" in /*) ;; *) t="$(dirname "$1")/$t" ;; esac
   [ "$(cd "$(dirname "$t")" 2>/dev/null && pwd -P)/$(basename "$t")" = "$2" ]
+}
+
+# True if <link> is a symlink naming exactly "$repo/<old target>", the path a
+# pre-rename install created. That target is dangling by construction, so only
+# its directory is resolved, physically; a link whose directory does not
+# resolve, or that names anything else (another clone, a live file in this one,
+# a `..` escape), is not ours. Same test as bin/doctor's stale-link row.
+is_pre_rename_link() { # is_pre_rename_link <link> <repo-relative old target>
+  local t d
+  [ -L "$1" ] || return 1
+  t="$(readlink "$1")"
+  case "$t" in
+    /*) ;;
+    *) d="$(CDPATH='' cd -P -- "$(dirname "$1")" 2>/dev/null && pwd -P)" || return 1
+       t="$d/$t" ;;
+  esac
+  d="$(CDPATH='' cd -P -- "$(dirname "$t")" 2>/dev/null && pwd -P)" || return 1
+  [ "$d/$(basename "$t")" = "$repo/$2" ]
+}
+
+# The delegate-build rename left three links under ~/.claude that name paths
+# this clone no longer has. Remove each one that still names its old target;
+# rm on a symlink acts on the link itself, so a dangling one goes too. Anything
+# else at those paths is not ours, and nothing is linked there any more, so it
+# is left alone without comment.
+migrate_pre_rename() {
+  local pair old dst found=0
+  for pair in skills/opus-build:opus-build \
+              agents/opus-builder.md:agents/opus-builder.md \
+              agents/opus-reviewer.md:agents/opus-reviewer.md; do
+    old="${pair%%:*}"; dst="$HOME/.claude/$old"
+    is_pre_rename_link "$dst" "${pair#*:}" || continue
+    found=1
+    if rm -f -- "$dst"; then
+      row "$dst" "$OK" "removed pre-rename link"; removed=$((removed+1))
+    else
+      row "$dst" "$NO" "pre-rename link could not be removed; left alone"; refused=$((refused+1))
+    fi
+  done
+  [ "$found" = 1 ] || row "pre-rename links" "$OK" "none present"
 }
 
 link() { # link <repo-relative source> <absolute target>
@@ -77,14 +122,16 @@ echo "skills install — $repo"
 
 echo
 echo "Claude Code (required set)"
-link CLAUDE.global.md        "$HOME/.claude/CLAUDE.md"
-link audit-directives        "$HOME/.claude/skills/audit-directives"
-link opus-build              "$HOME/.claude/skills/opus-build"
+migrate_pre_rename
+link CLAUDE.global.md            "$HOME/.claude/CLAUDE.md"
+link audit-directives            "$HOME/.claude/skills/audit-directives"
+link delegate-build              "$HOME/.claude/skills/delegate-build"
 render_agents
-link agents/opus-builder.md  "$HOME/.claude/agents/opus-builder.md"
-link agents/opus-reviewer.md "$HOME/.claude/agents/opus-reviewer.md"
-link agents/researcher.md    "$HOME/.claude/agents/researcher.md"
-link commands/iterate.md     "$HOME/.claude/commands/iterate.md"
+link agents/delegate-builder.md  "$HOME/.claude/agents/delegate-builder.md"
+link agents/claude-reviewer.md   "$HOME/.claude/agents/claude-reviewer.md"
+link agents/researcher.md        "$HOME/.claude/agents/researcher.md"
+link agents/scout.md             "$HOME/.claude/agents/scout.md"
+link commands/iterate.md         "$HOME/.claude/commands/iterate.md"
 
 if [ "$do_codex" = 1 ]; then
   echo
@@ -105,7 +152,7 @@ if [ "$do_copilot" = 1 ]; then
 fi
 
 echo
-echo "$made created, $kept already in place, $refused left alone."
+echo "$made created, $kept already in place, $removed pre-rename links removed, $refused left alone."
 if [ "$refused" -gt 0 ]; then
   echo "Paths left alone hold your existing content. Fold it into your fork"
   echo "first (see SETUP.md), move the old file away, then rerun."
