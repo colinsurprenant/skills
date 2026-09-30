@@ -1,92 +1,108 @@
 {
   "active_source": "config",
   "arch": "aarch64-apple-darwin",
-  "binary_sha256": "80a3933d11a9d13ef806aa24f7bb8afc9169cfe4e9b09d6da6a92922cbde9cff",
-  "configured_model": "gpt-5.6-sol",
+  "binary_sha256": "16593cc2f422d5f398a8e40f550ebbaf1245392528957be342c295920a300704",
+  "configured_model": "gpt-6-astra",
   "prompts": [
     {
       "active": false,
-      "bytes": 21672,
+      "bytes": 21779,
       "file": "prompt-1.txt",
       "models": [
-        "gpt-5.2"
+        "gpt-6.1-sol"
       ],
-      "sha256": "c9b2fa097ac69cae82c3d2ae12271083890a96521c55ad8dc14cae5168ad3f39"
+      "sha256": "e1bdd4f8f0df4b20f4a0ffc8a861ce819df45325d8cecdfb92e80379cf8d142e"
     },
     {
       "active": false,
-      "bytes": 20903,
+      "bytes": 21473,
       "file": "prompt-2.txt",
-      "models": [],
-      "sha256": "ac8ae107a0d72fe3476b430afb161ea4e67da2e446d778aefc44828160559807"
-    },
-    {
-      "active": false,
-      "bytes": 19766,
-      "file": "prompt-3.txt",
       "models": [
         "gpt-5.5"
       ],
-      "sha256": "c13cc50bc068912608769224bf2c5ffcb5f534856fd631f3df0ef72a8a3108a4"
-    },
-    {
-      "active": false,
-      "bytes": 19749,
-      "file": "prompt-4.txt",
-      "models": [
-        "gpt-5.5"
-      ],
-      "sha256": "e58c21f9377e946e2e10f886fcbf6f030e1c6fd9067241c637a56e9e998d3c31"
+      "sha256": "2351631dfc5644dc5a45eaaca4139475bd02810ee6cb792d058b551559b3242e"
     },
     {
       "active": true,
-      "bytes": 17766,
-      "file": "prompt-5.txt",
+      "bytes": 21428,
+      "file": "prompt-3.txt",
       "models": [
+        "gpt-6-astra"
+      ],
+      "sha256": "35bd51b5f577cb7b24cd5f4629e49e37cb724ab57754ce6f8f202001635bab8a"
+    },
+    {
+      "active": false,
+      "bytes": 21009,
+      "file": "prompt-4.txt",
+      "models": [],
+      "sha256": "0b724c100d94f9b8738a1f374eb6050890cdfd2ca386fd2660a16023bf2da397"
+    },
+    {
+      "active": false,
+      "bytes": 20968,
+      "file": "prompt-5.txt",
+      "models": [],
+      "sha256": "dc7b62c9d74f67ead2796a189bea91bf45355c46c674e5b302ded66c8fb6fa68"
+    },
+    {
+      "active": false,
+      "bytes": 18998,
+      "file": "prompt-6.txt",
+      "models": [
+        "gpt-6-sol"
+      ],
+      "sha256": "b1dd8718c037906c53a305c5cbccb4a4be35ccbb7837461ec349bfc495412f0d"
+    },
+    {
+      "active": false,
+      "bytes": 18043,
+      "file": "prompt-7.txt",
+      "models": [
+        "gpt-6-luna"
+      ],
+      "sha256": "b707476816bfe5e571a1bd2179f130fff2b132da5ab8e61063acdb7fd24daf12"
+    },
+    {
+      "active": false,
+      "bytes": 17766,
+      "file": "prompt-8.txt",
+      "models": [
+        "codex-auto-review",
         "gpt-5.6-luna",
         "gpt-5.6-sol",
         "gpt-5.6-terra"
       ],
-      "sha256": "cbefa6b0bede0e332d957fca70ccacf9f12f4c0ecdf81b819e5cbe1a3b16e265"
+      "sha256": "a91357a1cd2727a0be06d461248d6e3a7274746e38108f548a3adf2cc2430415"
     },
     {
       "active": false,
-      "bytes": 12928,
-      "file": "prompt-6.txt",
-      "models": [
-        "codex-auto-review",
-        "gpt-5.4"
-      ],
-      "sha256": "b247d52d7da990f1e4b049a413654762d050b6dc359a7a6bb651d0f49e1971e3"
-    },
-    {
-      "active": false,
-      "bytes": 12911,
-      "file": "prompt-7.txt",
-      "models": [
-        "codex-auto-review",
-        "gpt-5.4"
-      ],
-      "sha256": "9721f7a86edc261996e628fe14fade8d66ec60e6cc727274a8da6a03e15464de"
-    },
-    {
-      "active": false,
-      "bytes": 11148,
-      "file": "prompt-8.txt",
-      "models": [
-        "gpt-5.4-mini"
-      ],
-      "sha256": "0394376e4d03e5f5ce6ea7f7ee22de6a5f23fde3a5a9cf21ea35114e18abf0a4"
-    },
-    {
-      "active": false,
-      "bytes": 11131,
+      "bytes": 17312,
       "file": "prompt-9.txt",
       "models": [
-        "gpt-5.4-mini"
+        "gpt-daybreak-blue-latest"
       ],
-      "sha256": "9109777dc7f3bc9ee9a0d187982b13538c53e0572de2959300f7226e9c59855e"
+      "sha256": "ebd0d5854abd07dc38300a71e027204eb028e9fa443c59d18e36fcc24289e818"
+    },
+    {
+      "active": false,
+      "bytes": 17311,
+      "file": "prompt-10.txt",
+      "models": [
+        "gpt-daybreak-red-latest"
+      ],
+      "sha256": "40a1232c8bd01a87dc2283e5ae3c75f2b054dc2a12cf04e5a279c26e5c541b9b"
+    },
+    {
+      "active": false,
+      "bytes": 9734,
+      "file": "prompt-11.txt",
+      "models": [
+        "codex-auto-review",
+        "gpt-5.6-luna"
+      ],
+      "sha256": "f47fbb2bdba5e7528bfae7f5e2844a7d45a3a922fa74b718f22b22917376cfcf"
     }
   ],
-  "version": "0.144.6"
+  "version": "0.159.2"
 }
