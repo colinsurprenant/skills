@@ -44,9 +44,9 @@ it is a no-op otherwise and ends with the doctor report.
 The build skill and its agents were renamed to model-agnostic names
 (`opus-build` is now `delegate-build`, `opus-builder` is `delegate-builder`,
 `opus-reviewer` is `claude-reviewer`, and a `scout` agent was added). After a
-pull that crosses the rename, `bin/install` removes the old links that still
-point into this clone, leaves anything else at those paths alone and says so,
-and creates the new ones. If you linked by hand, remove the old three
+pull that crosses the rename, `bin/install` removes each old link that still
+names its old target in this clone, silently leaves anything else at those
+paths alone, and creates the new ones. If you linked by hand, remove the old three
 yourself:
 
     rm ~/.claude/skills/opus-build ~/.claude/agents/opus-builder.md ~/.claude/agents/opus-reviewer.md
