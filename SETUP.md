@@ -1,7 +1,7 @@
 # Setup
 
 This repo is a menu, not a bundle. Claude Code plus a handful of symlinks is
-the whole required install; everything else (Codex, OpenCode, Kimi K3,
+the whole required install; everything else (Codex, OpenCode, Kimi,
 sandboxing, the status line) is optional and independent. A tool you don't
 have retires the one lane that needs it and changes nothing else.
 
@@ -41,12 +41,22 @@ the name and description listings snapshot at session start). Rerunning
 `bin/install` covers the remaining case, a pull that introduces a new link;
 it is a no-op otherwise and ends with the doctor report.
 
+The build skill and its agents were renamed to model-agnostic names
+(`opus-build` is now `delegate-build`, `opus-builder` is `delegate-builder`,
+`opus-reviewer` is `claude-reviewer`, and a `scout` agent was added). After a
+pull that crosses the rename, `bin/install` removes the old links that still
+point into this clone, leaves anything else at those paths alone and says so,
+and creates the new ones. If you linked by hand, remove the old three
+yourself:
+
+    rm ~/.claude/skills/opus-build ~/.claude/agents/opus-builder.md ~/.claude/agents/opus-reviewer.md
+
 ## Check what you have
 
     bin/doctor
 
 Reports which tools are installed, which symlinks resolve into this clone, and
-which opus-build review lanes are live. Run it again after any step below.
+which delegate-build review lanes are live. Run it again after any step below.
 `bin/doctor --deep` additionally verifies the OpenCode model slug, which needs
 network. Unmet optional checks are informational: they tell you which lane is
 retired, not that something is broken. The exit status scores only the
@@ -55,13 +65,14 @@ required checks, so a Claude-only install exits 0.
 ## Required: Claude Code
 
     mkdir -p ~/.claude/skills ~/.claude/agents ~/.claude/commands
-    ln -s "$REPO/CLAUDE.global.md"        ~/.claude/CLAUDE.md
-    ln -s "$REPO/audit-directives"        ~/.claude/skills/audit-directives
-    ln -s "$REPO/opus-build"              ~/.claude/skills/opus-build
-    ln -s "$REPO/agents/opus-builder.md"  ~/.claude/agents/opus-builder.md
-    ln -s "$REPO/agents/opus-reviewer.md" ~/.claude/agents/opus-reviewer.md
-    ln -s "$REPO/agents/researcher.md"    ~/.claude/agents/researcher.md
-    ln -s "$REPO/commands/iterate.md"     ~/.claude/commands/iterate.md
+    ln -s "$REPO/CLAUDE.global.md"            ~/.claude/CLAUDE.md
+    ln -s "$REPO/audit-directives"            ~/.claude/skills/audit-directives
+    ln -s "$REPO/delegate-build"              ~/.claude/skills/delegate-build
+    ln -s "$REPO/agents/delegate-builder.md"  ~/.claude/agents/delegate-builder.md
+    ln -s "$REPO/agents/claude-reviewer.md"   ~/.claude/agents/claude-reviewer.md
+    ln -s "$REPO/agents/researcher.md"        ~/.claude/agents/researcher.md
+    ln -s "$REPO/agents/scout.md"             ~/.claude/agents/scout.md
+    ln -s "$REPO/commands/iterate.md"         ~/.claude/commands/iterate.md
 
 If you already have a `~/.claude/CLAUDE.md`, the first link fails rather than
 clobbering it: fold your content into your fork of `CLAUDE.global.md` (it has
@@ -108,17 +119,19 @@ bands assume autocompact is off, so they mark proximity to a hard wall. With
 autocompact enabled your session compacts well before the top bands, and the
 number no longer predicts when.
 
-## Optional: opus-build review lanes
+## Optional: delegate-build review lanes
 
-opus-build Phase 4 runs whichever of these are installed and reports the ones
-it skipped. None is required; with none of them the phase falls back to the
-in-session `opus-reviewer` agent or is skipped.
+delegate-build Phase 4 runs whichever of these are installed and reports the
+ones it skipped. None is required; with none of them the phase falls back to
+the in-session `claude-reviewer` agent or is skipped. Lanes are named by model
+family (Claude, GPT, Kimi); the model inside a lane and the path that reaches
+it are pinned in `roster.conf` and can change without renaming the lane.
 
 | Lane | Needs | Notes |
 | --- | --- | --- |
-| Codex | the `openai/codex-plugin-cc` Claude Code plugin | read-only by the plugin's own default. The lane dispatches the plugin's own `/codex:rescue` command, not one defined here: the plugin's dedicated `/codex:review` commands are user-invocable only, so opus-build frames the fix-capable rescue agent as review-only by prompt |
-| Kimi K3 | `opencode`, a Kimi provider, and `srt` | model and optional reasoning variant pinned from `roster.conf` at the repo root; change the slug there if your provider spells it differently |
-| Opus (sandboxed) | `claude` on PATH and `srt` | model and effort pinned from `roster.conf` at the repo root |
+| GPT (via Codex) | the `openai/codex-plugin-cc` Claude Code plugin | read-only by the plugin's own default. The lane dispatches the plugin's own `/codex:rescue` command, not one defined here: the plugin's dedicated `/codex:review` commands are user-invocable only, so delegate-build frames the fix-capable rescue agent as review-only by prompt |
+| Kimi (via OpenCode) | `opencode`, a Kimi provider, and `srt` | model and optional reasoning variant pinned from `roster.conf` at the repo root; change the slug there if your provider spells it differently |
+| Claude (sandboxed, opt-in) | `claude` on PATH and `srt` | model and effort pinned from `roster.conf` at the repo root |
 
 Every lane takes its model and effort from `roster.conf` at the repo root, the
 one place either is set. The wrappers read it at launch, so an edit there is

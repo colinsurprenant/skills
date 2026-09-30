@@ -2,6 +2,8 @@
 # Creates the symlinks SETUP.md documents: the required Claude Code set by
 # default, the optional harness links by flag. Renders agents/*.md frontmatter
 # from roster.conf first, so the links land on current files.
+# Before linking, removes links left by the delegate-build rename (opus-build,
+# opus-builder, opus-reviewer) that still point into this clone.
 # Idempotent and non-clobbering:
 # a link already resolving into this clone is left alone, and anything else
 # occupying a target path is reported, never replaced. Finishes by running
@@ -24,7 +26,7 @@ for arg in "$@"; do
   esac
 done
 
-made=0; kept=0; refused=0; render_failed=0
+made=0; kept=0; removed=0; refused=0; render_failed=0
 OK="  ok  "; NO="  --  "
 row() { printf '  %-44s %s %s\n' "${1/#$HOME/~}" "$2" "${3:-}"; }
 
@@ -37,6 +39,44 @@ links_to() { # links_to <link> <absolute expected source>
   t="$(readlink "$1")"
   case "$t" in /*) ;; *) t="$(dirname "$1")/$t" ;; esac
   [ "$(cd "$(dirname "$t")" 2>/dev/null && pwd -P)/$(basename "$t")" = "$2" ]
+}
+
+# True if <link> is a symlink whose readlink text points into this clone. The
+# target is read as text, never resolved: a stale pre-rename link is dangling by
+# construction, so resolving it would find nothing. Only the target's directory
+# is canonicalized (when it exists), so a relative link or a `..` spelling still
+# lands under "$repo". Same test as bin/doctor's stale-link row.
+points_into_clone() { # points_into_clone <link>
+  local t d
+  [ -L "$1" ] || return 1
+  t="$(readlink "$1")"
+  case "$t" in /*) ;; *) t="$(dirname "$1")/$t" ;; esac
+  d="$(CDPATH='' cd -- "$(dirname "$t")" 2>/dev/null && pwd -P)" || d="$(dirname "$t")"
+  case "$d/$(basename "$t")" in "$repo"/*) return 0 ;; *) return 1 ;; esac
+}
+
+# The delegate-build rename left three links under ~/.claude that point at paths
+# this clone no longer has. Remove each one that points into this clone; rm on
+# a symlink acts on the link itself, so a dangling one goes too. Anything else at
+# those paths belongs to someone else: reported and left alone, exactly like a
+# link() refusal.
+migrate_pre_rename() {
+  local old dst found=0
+  for old in skills/opus-build agents/opus-builder.md agents/opus-reviewer.md; do
+    dst="$HOME/.claude/$old"
+    if points_into_clone "$dst"; then
+      found=1
+      if rm -f -- "$dst"; then
+        row "$dst" "$OK" "removed pre-rename link"; removed=$((removed+1))
+      else
+        row "$dst" "$NO" "pre-rename link could not be removed; left alone"; refused=$((refused+1))
+      fi
+    elif [ -e "$dst" ] || [ -L "$dst" ]; then
+      found=1
+      row "$dst" "$NO" "exists and is not a pre-rename link into this clone; left alone"; refused=$((refused+1))
+    fi
+  done
+  [ "$found" = 1 ] || row "pre-rename links" "$OK" "none present"
 }
 
 link() { # link <repo-relative source> <absolute target>
@@ -77,14 +117,16 @@ echo "skills install — $repo"
 
 echo
 echo "Claude Code (required set)"
-link CLAUDE.global.md        "$HOME/.claude/CLAUDE.md"
-link audit-directives        "$HOME/.claude/skills/audit-directives"
-link opus-build              "$HOME/.claude/skills/opus-build"
+migrate_pre_rename
+link CLAUDE.global.md            "$HOME/.claude/CLAUDE.md"
+link audit-directives            "$HOME/.claude/skills/audit-directives"
+link delegate-build              "$HOME/.claude/skills/delegate-build"
 render_agents
-link agents/opus-builder.md  "$HOME/.claude/agents/opus-builder.md"
-link agents/opus-reviewer.md "$HOME/.claude/agents/opus-reviewer.md"
-link agents/researcher.md    "$HOME/.claude/agents/researcher.md"
-link commands/iterate.md     "$HOME/.claude/commands/iterate.md"
+link agents/delegate-builder.md  "$HOME/.claude/agents/delegate-builder.md"
+link agents/claude-reviewer.md   "$HOME/.claude/agents/claude-reviewer.md"
+link agents/researcher.md        "$HOME/.claude/agents/researcher.md"
+link agents/scout.md             "$HOME/.claude/agents/scout.md"
+link commands/iterate.md         "$HOME/.claude/commands/iterate.md"
 
 if [ "$do_codex" = 1 ]; then
   echo
@@ -105,7 +147,7 @@ if [ "$do_copilot" = 1 ]; then
 fi
 
 echo
-echo "$made created, $kept already in place, $refused left alone."
+echo "$made created, $kept already in place, $removed pre-rename links removed, $refused left alone."
 if [ "$refused" -gt 0 ]; then
   echo "Paths left alone hold your existing content. Fold it into your fork"
   echo "first (see SETUP.md), move the old file away, then rerun."

@@ -49,7 +49,7 @@ practice, quality control is whatever one aggregation LLM call happens to
 do in one shot.
 
 The counter-design in this repo: review is a phase of the
-[opus-build](../opus-build/SKILL.md) workflow, not a class; the two-tier
+[opus-build](../delegate-build/SKILL.md) workflow, not a class; the two-tier
 dispatch rule in [AGENT_BEHAVIOR.md](../AGENT_BEHAVIOR.md) sends any
 output that will be acted on unchecked to the judgment tier. A
 verification stage that exists only in configuration is worse than an

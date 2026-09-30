@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # The ONE reader for roster.conf. Every consumer — bin/roster-render, bin/doctor,
-# the opus-build review wrappers — goes through this script, so validation,
+# the delegate-build review wrappers — goes through this script, so validation,
 # duplicate handling, empty values and error text have exactly one definition
 # and every consumer fails the same way on the same file.
 #
@@ -20,9 +20,10 @@ repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 file="$repo/roster.conf"
 
 # Keys allowed to hold an empty value. Empty is a real setting for these (see
-# K3_VARIANT: omit opencode's --variant and take the provider default); for
-# every other key an empty value is a half-finished edit, not a choice.
-optional_empty=" K3_VARIANT "
+# KIMI_REVIEWER_VARIANT: omit opencode's --variant and take the provider
+# default); for every other key an empty value is a half-finished edit, not a
+# choice.
+optional_empty=" KIMI_REVIEWER_VARIANT "
 
 usage() { echo "usage: bin/roster-get [--file <path>] KEY" >&2; exit 2; }
 die()   { echo "roster-get: $*" >&2; exit 78; }
