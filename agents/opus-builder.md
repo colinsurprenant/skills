@@ -1,6 +1,6 @@
 ---
 name: opus-builder
-description: Implementation agent for the opus-build workflow. Executes one self-contained build work order — code changes plus verification — and reports the results. Use when dispatching build work orders from a Fable session per the opus-build skill; not for exploration, review, or planning.
+description: Implementation agent for the opus-build workflow. Executes one self-contained build work order — code changes plus verification — and reports the results. Use when dispatching build work orders from the orchestrating main loop per the opus-build skill; not for exploration, review, or planning.
 model: sonnet
 effort: xhigh
 ---
