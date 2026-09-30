@@ -22,13 +22,21 @@ path):
 ## Install
 
     bin/install            # required Claude Code links, then doctor
-    bin/install --all      # plus the Codex, OpenCode, and Copilot CLI links
+    bin/install --all      # plus the Codex (links and agent files), OpenCode, and Copilot CLI setup
     bin/install --copilot  # or any subset: --codex, --opencode, --copilot
 
 Idempotent and non-clobbering: a link already resolving to its documented
 target is left alone, and anything else found at a target path, a stray
 file or a link to the wrong place, is reported and kept, never replaced. The manual sections below are the same links spelled out,
 kept for transparency and for partial installs.
+
+`--codex` does more than link: besides the `AGENTS.md` link it links
+`delegate-build` into `~/.agents/skills` and renders three Codex agent files
+(`delegate-builder.toml`, `scout.toml`, `researcher.toml`, pinned from the
+`CODEX_*` keys in `roster.conf`) into `~/.codex/agents` as regular files, since
+Codex refuses symlinked agent files. A plain `bin/install` only refreshes the
+agent files it generated earlier; it never creates Codex files or the
+`~/.agents` link.
 
 ## Update
 
@@ -37,9 +45,12 @@ kept for transparency and for partial installs.
 
 Content updates need only the pull: skill and agent bodies resolve through
 the symlinks at invocation time, so pulled edits are live immediately (only
-the name and description listings snapshot at session start). Rerunning
-`bin/install` covers the remaining case, a pull that introduces a new link;
-it is a no-op otherwise and ends with the doctor report.
+the name and description listings snapshot at session start). The exception
+is the Codex agent files: they are generated copies, so a pulled change to an
+agent body or a `CODEX_*` pin reaches Codex on the next `bin/install`, which
+refreshes the ones it generated earlier. Rerunning `bin/install` also covers a
+pull that introduces a new link; with no Codex agent files to refresh it is a
+no-op otherwise, and it ends with the doctor report.
 
 The build skill and its agents were renamed to model-agnostic names
 (`opus-build` is now `delegate-build`, `opus-builder` is `delegate-builder`,
@@ -57,6 +68,10 @@ yourself:
 
 Reports which tools are installed, which symlinks resolve into this clone, and
 which delegate-build review lanes are live. Run it again after any step below.
+Its optional Codex rows cover the `~/.agents/skills/delegate-build` link and
+each generated agent file, checked whole against `roster.conf` and the
+`agents/*.md` bodies (drift names `bin/install --codex` as the fix), or one row
+saying Codex is not installed.
 `bin/doctor --deep` additionally verifies the OpenCode model slug, which needs
 network. Unmet optional checks are informational: they tell you which lane is
 retired, not that something is broken. The exit status scores only the
@@ -104,6 +119,34 @@ sources), and a running session does not pick up changes; they apply from
 the next session. To confirm the wiring once, run `/instructions` inside a
 session and look for "Home copilot-instructions.md" under the User group.
 
+## Optional: delegate-build on Codex
+
+`bin/install --codex` also makes delegate-build runnable from a Codex main
+loop: it links the skill into `~/.agents/skills/delegate-build` and renders
+three agent files, `delegate-builder.toml`, `scout.toml` and `researcher.toml`,
+into `~/.codex/agents`. They are generated from the `CODEX_*` keys in
+`roster.conf` plus the bodies of `agents/*.md`, so the instructions have one
+source. Codex refuses symlinked agent files, which is why these are real files,
+refreshed by a plain `bin/install` after a pull (only ones it generated
+earlier; it never creates them). The manual equivalent:
+
+    mkdir -p ~/.agents/skills
+    ln -s "$REPO/delegate-build" ~/.agents/skills/delegate-build
+    "$REPO/bin/roster-render" --codex ~/.codex/agents
+
+`bin/roster-render --codex <dir>` renders into any directory you name, and
+`--claude <dir>` does the same for the four Claude agents, which is how a
+staged run gets pinned copies; add `--check` to verify a directory without
+writing. The agent file format was verified against Codex CLI 0.159.2.
+
+Start the main loop with `codex --sandbox workspace-write --ask-for-approval
+on-request` and invoke the skill as `$delegate-build`; it skips itself on any
+main-loop model other than GPT-6 Astra. Workers inherit the main loop's
+sandbox, so the scout and researcher are read-only by their instructions only.
+[delegate-build/codex.md](delegate-build/codex.md) covers the rest: approvals,
+escalating the Kimi and Claude wrappers out of Codex's sandbox, and why the GPT
+lane is not offered from Codex.
+
 ## Optional: status line
 
 Needs `node`. In `~/.claude/settings.json`, the one place that needs a literal
@@ -123,9 +166,10 @@ number no longer predicts when.
 
 delegate-build Phase 4 runs whichever of these are installed and reports the
 ones it skipped. None is required; with none of them the phase falls back to
-the in-session `claude-reviewer` agent or is skipped. Lanes are named by model
-family (Claude, GPT, Kimi); the model inside a lane and the path that reaches
-it are pinned in `roster.conf` and can change without renaming the lane.
+the in-session `claude-reviewer` agent (Claude Code only) or is skipped. Lanes
+are named by model family (Claude, GPT, Kimi); the model inside a lane and the
+path that reaches it are pinned in `roster.conf` and can change without
+renaming the lane.
 
 | Lane | Needs | Notes |
 | --- | --- | --- |
@@ -135,8 +179,14 @@ it are pinned in `roster.conf` and can change without renaming the lane.
 
 Every lane takes its model and effort from `roster.conf` at the repo root, the
 one place either is set. The wrappers read it at launch, so an edit there is
-live with no reinstall. [ROSTER.md](ROSTER.md) explains the roles and which key
+live with no reinstall; only the Codex agent files are copies, reached by
+`bin/install`. [ROSTER.md](ROSTER.md) explains the roles and which key
 feeds which lane, and `bin/doctor` prints the pins each lane will use.
+
+From a Codex main loop, the Kimi and Claude lanes run the same wrappers through
+`~/.agents/skills/delegate-build/sandbox/`, each escalated out of Codex's
+sandbox because srt cannot start inside it. The GPT lane is that loop's own
+lineage and is not offered, and there is no in-session Claude fallback.
 
 The two sandboxed lanes refuse to run without the sandbox runtime rather than
 degrading to an unsandboxed run:

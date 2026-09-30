@@ -2,6 +2,13 @@
 # Creates the symlinks SETUP.md documents: the required Claude Code set by
 # default, the optional harness links by flag. Renders agents/*.md frontmatter
 # from roster.conf first, so the links land on current files.
+# --codex also links the delegate-build skill into ~/.agents/skills and renders
+# the delegate-builder, scout and researcher agent files into ~/.codex/agents.
+# Those are regular files, not links (Codex refuses a symlinked agent file), so
+# they do not follow a git pull by themselves: every run, with or without
+# --codex, refreshes the ones an earlier run generated, and never creates them
+# or the ~/.agents link without --codex. A path there that bin/roster-render did
+# not generate (no marker line) or that is a symlink is an error, left alone.
 # Before linking, removes links left by the delegate-build rename (opus-build,
 # opus-builder, opus-reviewer) that still name their old target in this clone.
 # Idempotent and non-clobbering:
@@ -117,6 +124,28 @@ render_agents() {
   done <<< "$r_out"
 }
 
+# The Codex agent files are copies, rendered by bin/roster-render --codex, so
+# each of its lines becomes a row, as render_agents does. An error line, any
+# line that is not one of the known verbs, or a non-zero exit is a failed
+# render, but the rows of the files that did render still show.
+codex_rows() { # codex_rows <bin/roster-render output> <its exit status>
+  local line verb rest path note
+  while IFS= read -r line; do
+    [ -n "$line" ] || continue
+    verb="${line%% *}"; rest="${line#* }"
+    case "$verb" in
+      rendered|unchanged|ok)
+        path="${rest%% *}"; note="${rest#"$path"}"; note="${note# }"
+        row "$path" "$OK" "$verb${note:+ $note}" ;;
+      error)
+        row "${rest%%: *}" "$NO" "${rest#*: }"; render_failed=1 ;;
+      *)
+        row "bin/roster-render" "$NO" "$line"; render_failed=1 ;;
+    esac
+  done <<< "$1"
+  [ "$2" -eq 0 ] || render_failed=1
+}
+
 echo
 echo "skills install — $repo"
 
@@ -137,6 +166,20 @@ if [ "$do_codex" = 1 ]; then
   echo
   echo "Codex CLI"
   link AGENT_BEHAVIOR.md "$HOME/.codex/AGENTS.md"
+  link delegate-build "$HOME/.agents/skills/delegate-build"
+  c_out="$("$repo/bin/roster-render" --codex "$HOME/.codex/agents" 2>&1)"; c_rc=$?
+  codex_rows "$c_out" "$c_rc"
+else
+  # Without --codex nothing is created; files a --codex run generated earlier
+  # are brought up to date, so a pull that changed roster.conf or an agent body
+  # reaches Codex on the next install. --refresh prints nothing when there is
+  # nothing to refresh, and then so does this.
+  c_out="$("$repo/bin/roster-render" --codex "$HOME/.codex/agents" --refresh 2>&1)"; c_rc=$?
+  if [ -n "$c_out" ] || [ "$c_rc" -ne 0 ]; then
+    echo
+    echo "Codex agent files (refreshed; bin/install --codex creates them)"
+    codex_rows "$c_out" "$c_rc"
+  fi
 fi
 
 if [ "$do_opencode" = 1 ]; then
@@ -158,7 +201,7 @@ if [ "$refused" -gt 0 ]; then
   echo "first (see SETUP.md), move the old file away, then rerun."
 fi
 if [ "$render_failed" = 1 ]; then
-  echo "bin/roster-render failed: agents/*.md frontmatter may not match roster.conf."
+  echo "bin/roster-render failed: agents/*.md frontmatter or the Codex agent files may not match roster.conf."
 fi
 
 # doctor is the referee for the links, but it cannot see that the render failed
