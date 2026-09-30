@@ -22,10 +22,12 @@ message id (last record wins); --no-dedup sums raw records instead, which is
 what a naive count reports and roughly doubles every number.
 
 cost: every transcript priced at RATES, with a per-model and per-transcript
-breakdown and the main/subagent rollup. RATES prices cache writes at the
-5-minute rate; a transcript whose usage reports 1-hour writes
-(cache_creation.ephemeral_1h_input_tokens) is noted with what the 1-hour rate
-(2x uncached input) would add, but the totals stay on RATES. A model with no
+breakdown and the main/subagent rollup. Each message's cache writes are
+priced by TTL: the tokens its usage reports as 1-hour writes
+(cache_creation.ephemeral_1h_input_tokens) at the 1-hour rate, the rest of
+cache_creation_input_tokens at the 5-minute rate; a message without that
+breakdown is priced wholly at the 5-minute rate. The per-model table splits
+the cache write line in two when a model has 1-hour writes. A model with no
 list rate (see rate_for()) is warned about once on stderr, listed under
 "unpriced" in the JSON, and left out of totals; text tables print "?" for a
 cost with nothing priced and a trailing "?" on a lower bound.
@@ -61,7 +63,8 @@ phases: main loop only.
     does not sum to the main-loop total.
   - Top admissions: the largest single pieces of user-side content by
     characters, hand-backs and skill bodies included.
-  - The 1-hour TTL note is printed as in cost, for the main loop's messages.
+  - Costs are priced as in cost. A closing note states how many cache-write
+    tokens each model wrote at the 1-hour TTL, for the main loop's messages.
 """
 
 import argparse
@@ -75,15 +78,19 @@ from datetime import datetime, timezone
 
 PROG = "measure-session"
 
-# USD per million tokens: (uncached input, cache read, cache write, output).
+# USD per million tokens: (uncached input, cache read, 5-minute cache write,
+# 1-hour cache write, output). List prices from
+# https://platform.claude.com/docs/en/about-claude/pricing, checked 2026-09-30.
 RATES = {
-    "claude-fable-5-1": (10.0, 0.25, 12.50, 50.0),
-    "claude-opus-4-7": (5.0, 0.50, 6.25, 25.0),
-    "claude-opus-5": (5.0, 0.50, 6.25, 25.0),
-    # Opus 5.5 list: 4 / 0.20 / 20; the 5-minute cache write is the standard
-    # 1.25x of input, not yet confirmed on the pricing page at the time of adding.
-    "claude-opus-5-5": (4.0, 0.20, 5.00, 20.0),
-    "claude-sonnet-5": (3.0, 0.30, 3.75, 15.0),
+    "claude-fable-5-1": (10.0, 0.25, 12.50, 20.0, 50.0),
+    # Fable 5 is a separate, older model: its cache read is the standard 0.1x.
+    "claude-fable-5": (10.0, 1.00, 12.50, 20.0, 50.0),
+    "claude-opus-4-7": (5.0, 0.50, 6.25, 10.0, 25.0),
+    "claude-opus-5": (5.0, 0.50, 6.25, 10.0, 25.0),
+    "claude-opus-5-5": (4.0, 0.20, 5.00, 8.0, 20.0),
+    "claude-sonnet-5": (2.0, 0.20, 2.50, 4.0, 10.0),
+    "claude-sonnet-5-5": (2.0, 0.20, 2.50, 4.0, 10.0),
+    "claude-haiku-4-5": (1.0, 0.10, 1.25, 2.0, 5.0),
 }
 
 FIELDS = (
@@ -239,7 +246,9 @@ def usd(model, usage):
             print("%s: warning: %s has no list rate; its cost shows as ? and "
                   "is left out of totals" % (PROG, model), file=sys.stderr)
         return None
-    return sum(tok(usage, f) * rates[i] / 1e6 for i, (_, f) in enumerate(FIELDS))
+    tokens = OrderedDict((f, tok(usage, f)) for _, f in FIELDS)
+    return sum(n * rate for _, n, rate in
+               priced_lines(tokens, one_hour_writes(usage), rates))
 
 
 def fmt_usd(value, partial=False, width=9):
@@ -249,11 +258,31 @@ def fmt_usd(value, partial=False, width=9):
 
 
 def one_hour_writes(usage):
+    """Cache-write tokens this message wrote at the 1-hour TTL, 0 when usage
+    has no cache_creation breakdown; never more than its total writes."""
     detail = usage.get("cache_creation")
     if isinstance(detail, dict):
         value = detail.get("ephemeral_1h_input_tokens", 0)
-        return value if isinstance(value, int) else 0
+        if isinstance(value, int):
+            return min(max(value, 0), tok(usage, "cache_creation_input_tokens"))
     return 0
+
+
+def priced_lines(tokens, hour, rates):
+    """[(label, tokens, USD per token)] for FIELDS token counts with hour of
+    the cache writes at the 1-hour TTL: the cache write line is split into its
+    5-minute and 1-hour parts when hour is non-zero. rates is a RATES tuple,
+    or None for an unpriced model (every rate then None)."""
+    rate = (lambda i: None) if rates is None else (lambda i: rates[i] / 1e6)
+    written = tokens["cache_creation_input_tokens"]
+    if hour:
+        writes = [("cache write 5m", written - hour, rate(2)),
+                  ("cache write 1h", hour, rate(3))]
+    else:
+        writes = [("cache write", written, rate(2))]
+    return ([("uncached input", tokens["input_tokens"], rate(0)),
+             ("cache read", tokens["cache_read_input_tokens"], rate(1))]
+            + writes + [("output", tokens["output_tokens"], rate(4))])
 
 
 def summarize(messages):
@@ -262,8 +291,7 @@ def summarize(messages):
     for model, usage in messages.values():
         row = by_model.setdefault(model, {
             "messages": 0, "tokens": OrderedDict((f, 0) for _, f in FIELDS),
-            "usd": 0.0, "priced": True,
-            "cache_write_1h": 0, "usd_1h_extra": 0.0})
+            "usd": 0.0, "priced": True, "cache_write_1h": 0})
         row["messages"] += 1
         for _, field in FIELDS:
             row["tokens"][field] += tok(usage, field)
@@ -271,11 +299,7 @@ def summarize(messages):
         if cost is None:
             row["priced"] = False
         row["usd"] += cost or 0.0
-        hour = one_hour_writes(usage)
-        row["cache_write_1h"] += hour
-        rates = rate_for(model)
-        if rates is not None:
-            row["usd_1h_extra"] += hour * (2 * rates[0] - rates[2]) / 1e6
+        row["cache_write_1h"] += one_hour_writes(usage)
     return by_model
 
 
@@ -349,13 +373,11 @@ def cost_data(main_path, dedup, include_siblings):
         for model, row in by_model.items():
             agg = rollup.setdefault(model, {
                 "messages": 0, "tokens": OrderedDict((f, 0) for _, f in FIELDS),
-                "usd": 0.0, "priced": True, "cache_write_1h": 0,
-                "usd_1h_extra": 0.0})
+                "usd": 0.0, "priced": True, "cache_write_1h": 0})
             agg["priced"] = agg["priced"] and row["priced"]
             agg["messages"] += row["messages"]
             agg["usd"] += row["usd"]
             agg["cache_write_1h"] += row["cache_write_1h"]
-            agg["usd_1h_extra"] += row["usd_1h_extra"]
             for field, value in row["tokens"].items():
                 agg["tokens"][field] += value
 
@@ -368,8 +390,7 @@ def cost_data(main_path, dedup, include_siblings):
         "subagents_usd": total(("subagent",)),
         "siblings_usd": total(("sibling", "sibling-subagent")),
         "total_usd": sum(r["usd"] for r in rows),
-        "unpriced": [m for m, r in rollup.items() if not r["priced"]],
-        "usd_1h_extra": sum(r["usd_1h_extra"] for r in rollup.values())}
+        "unpriced": [m for m, r in rollup.items() if not r["priced"]]}
 
 
 def print_cost(data):
@@ -388,15 +409,14 @@ def print_cost(data):
             models, extra))
     print()
     for model, row in data["by_model"].items():
-        rates = rate_for(model)
         print("%s  (%d msgs)" % (model, row["messages"]))
-        for i, (label, field) in enumerate(FIELDS):
-            tokens = row["tokens"][field]
-            if rates is None:
+        for label, tokens, rate in priced_lines(
+                row["tokens"], row["cache_write_1h"], rate_for(model)):
+            if rate is None:
                 print("  %-14s %15s tok" % (label, "{:,}".format(tokens)))
                 continue
             print("  %-14s %15s tok  @ $%6.2f/M  $%9.4f" % (
-                label, "{:,}".format(tokens), rates[i], tokens * rates[i] / 1e6))
+                label, "{:,}".format(tokens), rate * 1e6, tokens * rate))
         if not row["priced"]:
             print("  unknown model: no list rate, not priced")
         else:
@@ -418,18 +438,14 @@ def print_cost(data):
     if data["dedup"] and collapsed:
         print("note: %d duplicate assistant records collapsed by message id"
               % collapsed)
-    print_ttl_notes(data["by_model"])
 
 
-def print_ttl_notes(by_model):
-    for model, row in by_model.items():
-        if row["cache_write_1h"]:
-            extra = "$%.4f" % row["usd_1h_extra"] if row["priced"] else "$? " \
-                "(no list rate)"
-            print("note: %s wrote %s cache tokens at the 1-hour TTL; priced "
-                  "here at the 5-minute rate, the 1-hour rate (2x input) "
-                  "would add %s" % (model, "{:,}".format(row["cache_write_1h"]),
-                                    extra))
+def print_ttl_notes(one_hour):
+    for model, row in one_hour.items():
+        print("note: %s wrote %s cache tokens at the 1-hour TTL%s" % (
+            model, "{:,}".format(row["cache_write_1h"]),
+            ", priced at the 1-hour rate" if row["priced"]
+            else " (no list rate)"))
 
 
 # --- phases -----------------------------------------------------------------
@@ -931,8 +947,7 @@ def phases_data(main_path, top):
         "work_orders": work_order_rows(messages, tools, agent_meta, consumed_at),
         "top_admissions": top_admissions(messages, tools, top),
         "one_hour": OrderedDict(
-            (m, {"cache_write_1h": r["cache_write_1h"], "priced": r["priced"],
-                 "usd_1h_extra": r["usd_1h_extra"] if r["priced"] else None})
+            (m, {"cache_write_1h": r["cache_write_1h"], "priced": r["priced"]})
             for m, r in by_model.items() if r["cache_write_1h"]),
         "timeline": [{"id": m["id"], "phase": m["phase"],
                       "boundary": m.get("reason"), "usd": m["usd"],
@@ -1009,7 +1024,27 @@ def selftest():
     reb = [msg(cached=0, written=1000, out=50),
            msg(cached=200, written=900, inputs=[{"chars": 3, "bucket": "Bash"}])]
     attribute(reb)
+    mtok = 1000000
+    hour_usage = {"input_tokens": 0, "cache_read_input_tokens": 0,
+                  "output_tokens": 0, "cache_creation_input_tokens": mtok,
+                  "cache_creation": {"ephemeral_5m_input_tokens": 400000,
+                                     "ephemeral_1h_input_tokens": 600000}}
+    flat_usage = {"cache_creation_input_tokens": mtok}
+    near = lambda a, b: a is not None and abs(a - b) < 1e-9
     checks = {
+        "1h write rate": near(usd("claude-opus-5", hour_usage),
+                              0.4 * 6.25 + 0.6 * 10.0),
+        "5m fallback": near(usd("claude-opus-5", flat_usage), 6.25),
+        "1h in summary": summarize({1: ("claude-opus-5", hour_usage)})
+        ["claude-opus-5"]["cache_write_1h"] == 600000,
+        "fable-5 row": rate_for("claude-fable-5") == (10.0, 1.00, 12.50, 20.0, 50.0)
+        and near(usd("claude-fable-5", {"cache_read_input_tokens": mtok}), 1.0),
+        "fable-5-1 row": near(usd("claude-fable-5-1",
+                                  {"cache_read_input_tokens": mtok}), 0.25),
+        "dated haiku": rate_for("claude-haiku-4-5-20251001") ==
+        RATES["claude-haiku-4-5"],
+        "dated haiku 1m": rate_for("claude-haiku-4-5-20251001[1m]") ==
+        RATES["claude-haiku-4-5"],
         "dated id": rate_for("claude-opus-5-20260401") == RATES["claude-opus-5"],
         "point release": rate_for("claude-opus-5-1") is None,
         "context suffix": rate_for("claude-opus-5[1m]") == RATES["claude-opus-5"],
