@@ -119,7 +119,15 @@ MARKER_PHASE = {"1": "plan", "2": "build", "3": "builder-review",
 FORWARD_REF = re.compile(r"\b(before|until|once|after|since|waiting|wait|"
                          r"preparing|prepare|ahead|next|when|"
                          r"skip|skipping|skipped)\b", re.I)
-PLAN_AGENTS = ("Explore", "general-purpose", "Plan")
+# Names the build workflow goes by, the current one first and the ones older
+# transcripts carry after it. A rename is one edit here, with the old name kept
+# so past sessions still measure the same.
+BUILD_SKILLS = ("delegate-build", "opus-build")
+BUILDER_AGENTS = ("delegate-builder", "opus-builder")
+REVIEWER_AGENTS = ("claude-reviewer", "opus-reviewer")
+LANE_WRAPPERS = ("claude-review.sh", "kimi-review.sh",
+                 "opus-review.sh", "k3-review.sh")
+PLAN_AGENTS = ("scout", "Explore", "general-purpose", "Plan")
 READ_ONLY_CMDS = {"cat", "sed", "grep", "rg", "ls", "head", "tail", "find",
                   "wc", "awk", "tree", "stat", "file", "cd", "echo", "date",
                   "pwd", "which"}
@@ -127,8 +135,8 @@ READ_ONLY_GIT = {"log", "status", "branch", "show", "diff", "rev-parse"}
 READ_ONLY_DIRECTOR = {"status", "render", "--help", "help"}
 NULL_REDIRECTS = re.compile(r"\d?>&\d|\d?>\s*/dev/null")
 # Matched against the basename of the program a shell segment runs, so reading
-# a wrapper's tee'd report ($TMPDIR/k3-review-XXXXXX) does not open a lane.
-LANE_WRAPPER = re.compile(r"^(?:k3|opus)-review\.sh$")
+# a wrapper's tee'd report ($TMPDIR/kimi-review-XXXXXX) does not open a lane.
+LANE_WRAPPER = re.compile(r"^(?:%s)$" % "|".join(map(re.escape, LANE_WRAPPERS)))
 REVIEW_WRAPPER = re.compile(r"review[\w.-]*\.sh$")
 LAUNCHERS = {"env", "nohup", "exec", "bash", "sh", "zsh", "time", "command",
              "timeout"}
@@ -669,12 +677,13 @@ def lane_launch(command, inp):
 
 
 def builds(name, inp):
-    """A dispatch of build work: an opus-builder agent, or a Workflow run
-    whose inline script names opus-builder (or that has no inline script)."""
+    """A dispatch of build work: a builder agent (BUILDER_AGENTS), or a Workflow
+    run whose inline script names one (or that has no inline script)."""
     if name == "Workflow":
         script = inp.get("script")
-        return not isinstance(script, str) or "opus-builder" in script
-    return str(inp.get("subagent_type", "")) == "opus-builder"
+        return not isinstance(script, str) or \
+            any(a in script for a in BUILDER_AGENTS)
+    return str(inp.get("subagent_type", "")) in BUILDER_AGENTS
 
 
 def marker_phase(text):
@@ -710,15 +719,15 @@ def message_signals(msg, in_plan):
                 not SCRATCH_PATH.search(str(inp.get("file_path", ""))):
             found.append((2, "build", "main-loop repo write"))
         elif dispatch and (agent_type.startswith("codex:") or
-                           agent_type == "opus-reviewer"):
+                           agent_type in REVIEWER_AGENTS):
             found.append((4, "lane", "review agent"))
             watch[tid] = "triage"
         elif dispatch and (agent_type in PLAN_AGENTS or name == "Workflow"):
             if in_plan:
                 found.append((3, "plan", "scout dispatch"))
-        elif name == "Skill" and inp.get("skill") == "opus-build":
+        elif name == "Skill" and inp.get("skill") in BUILD_SKILLS:
             if in_plan:
-                found.append((3, "plan", "opus-build activation"))
+                found.append((3, "plan", "build skill activation"))
         elif in_plan and (name in ("Read", "Grep", "Glob") or
                           (command and is_read_only(command))):
             found.append((3, "plan", "pre-build read"))
@@ -752,8 +761,8 @@ def classify(messages, consumed_at):
     "Phase N" text marker; 2 a builder dispatch (Agent, Task or Workflow) or
     main-loop repo write, then consuming a builder's result; 3 plan signals,
     only while still in plan (before any build, lane or review boundary);
-    4 a lane launch (codex, opus-reviewer, a review wrapper), then consuming a
-    lane's result, which opens triage; 5 commit, then director. Before any
+    4 a lane launch (codex, a reviewer agent, a review wrapper), then consuming
+    a lane's result, which opens triage; 5 commit, then director. Before any
     boundary the phase is plan. commit and director are one-shot: they label
     their own message only, and the phase before them carries on. A director
     call inside a turn with more than DIRECTOR_RIDE_ALONG_OUT output tokens is
@@ -1022,6 +1031,15 @@ def selftest():
                bash("director emit --type note"), out=5000),
            msg(bash("director emit --type note " + "x" * 12000), out=3200)]
     classify(seq, {})
+    def signals(name, plan=True, **inp):
+        block = {"type": "tool_use", "name": name, "id": "t", "input": inp}
+        return message_signals(msg(block), plan)[0]
+    agent = lambda kind, plan=True: signals("Agent", plan, subagent_type=kind)
+    skill = lambda name, plan=True: signals("Skill", plan, skill=name)
+    builder = [(2, "build", "builder dispatch")]
+    reviewer = [(4, "lane", "review agent")]
+    scouted = [(3, "plan", "scout dispatch")]
+    activated = [(3, "plan", "build skill activation")]
     reb = [msg(cached=0, written=1000, out=50),
            msg(cached=200, written=900, inputs=[{"chars": 3, "bucket": "Bash"}])]
     attribute(reb)
@@ -1062,6 +1080,29 @@ def selftest():
         "marker": marker_phase("Doing a Phase 3 read.") == "builder-review",
         "lane launch": lane_launch("cd r; ~/s/k3-review.sh 'p; q'", {}),
         "report read": not lane_launch("cat /tmp/k3-review-abc", {}),
+        "old lane wrapper": lane_launch("~/s/opus-review.sh 'p'", {}),
+        "claude lane wrapper": lane_launch("cd r; ~/s/claude-review.sh 'p; q'", {}),
+        "kimi lane wrapper": lane_launch("cd r; ~/s/kimi-review.sh 'p; q'", {}),
+        "new report read": not lane_launch("cat /tmp/kimi-review-abc", {}) and
+        not lane_launch("cat /tmp/claude-review-abc", {}),
+        "lane wrapper opens lane": [f[1:] for f in signals(
+            "Bash", command="~/s/kimi-review.sh 'p'")] == [("lane", "review wrapper")],
+        "build skill": skill("delegate-build") == activated,
+        "old build skill": skill("opus-build") == activated,
+        "build skill after plan": skill("delegate-build", False) == [],
+        "unrelated skill": skill("codex:rescue") == [(4, "lane", "codex:rescue skill")],
+        "builder dispatch": agent("delegate-builder") == builder,
+        "old builder dispatch": agent("opus-builder") == builder,
+        "workflow builder": builds("Workflow", {"script": "agent('delegate-builder')"}),
+        "old workflow builder": builds("Workflow", {"script": "agent('opus-builder')"}),
+        "workflow other agents": not builds("Workflow", {"script": "agent('Explore')"}),
+        "workflow no script": builds("Workflow", {"name": "w"}),
+        "claude-reviewer": agent("claude-reviewer") == reviewer,
+        "old reviewer": agent("opus-reviewer") == reviewer,
+        "codex agent": agent("codex:codex-rescue") == reviewer,
+        "scout dispatch": agent("scout") == scouted,
+        "explore dispatch": agent("Explore") == scouted,
+        "scout after plan": agent("scout", False) == [],
         "one-shot": [m["phase"] for m in seq] ==
         ["build", "director", "commit", "build", "build", "build", "build",
          "director"],
