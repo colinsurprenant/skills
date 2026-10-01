@@ -265,17 +265,22 @@ if [ "$roster_broken" = 0 ]; then
   else claude_pin="$claude_pin; $roster_err"; claude_pinned=0; fi
 fi
 # The plugin dispatches to the local codex CLI (it spawns `codex app-server`), so
-# the plugin entry alone does not make the lane live. Login is not checked.
+# the plugin entry alone does not make the lane live. Login is not checked. An
+# installed plugin counts as disabled only when enabledPlugins says false.
 if [ "$gpt_pinned" = 0 ]; then
   row "GPT (via Codex)" "$NO" "$gpt_pin"
 else
   gpt_plugin=0
-  grep -q "codex@openai-codex" "$HOME/.claude/plugins/installed_plugins.json" 2>/dev/null && gpt_plugin=1
+  if grep -q "codex@openai-codex" "$HOME/.claude/plugins/installed_plugins.json" 2>/dev/null; then
+    gpt_plugin=1
+    grep -q '"codex@openai-codex": *false' "$HOME/.claude/settings.json" 2>/dev/null && gpt_plugin=2
+  fi
   if [ "$gpt_plugin" = 1 ] && have codex; then
     row "GPT (via Codex)" "$OK" "codex plugin installed, codex on PATH; $gpt_pin"; lanes=$((lanes+1))
   else
     need=""
-    [ "$gpt_plugin" = 1 ] || need="the openai/codex-plugin-cc plugin"
+    [ "$gpt_plugin" = 0 ] && need="the openai/codex-plugin-cc plugin"
+    [ "$gpt_plugin" = 2 ] && need="the codex plugin enabled (enabledPlugins in ~/.claude/settings.json)"
     have codex || need="${need:+$need and }the codex CLI on PATH"
     row "GPT (via Codex)" "$NO" "needs $need; $gpt_pin"
   fi
