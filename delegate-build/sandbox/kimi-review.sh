@@ -30,8 +30,8 @@ fi
 # ~/.claude/skills/delegate-build symlink from Claude Code and the
 # ~/.agents/skills/delegate-build symlink from Codex). Two steps, both -P,
 # reach the real repo root either way.
-dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
-root="$(cd "$dir/../.." && pwd -P)"
+dir="$(CDPATH='' cd -P -- "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+root="$(CDPATH='' cd -P -- "$dir/../.." && pwd -P)"
 
 # Model and reasoning variant come from roster.conf at the repo root — the
 # single place models and efforts are set, so no pin lives in this file. Read

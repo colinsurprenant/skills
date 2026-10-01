@@ -37,8 +37,8 @@ fi
 # Resolve the script dir physically FIRST, then walk up: appending `/../..` to
 # an unresolved dirname is canonicalized textually and would land in
 # ~/.claude/skills or ~/.agents/skills instead of the repo.
-dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
-root="$(cd "$dir/../.." && pwd -P)"
+dir="$(CDPATH='' cd -P -- "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+root="$(CDPATH='' cd -P -- "$dir/../.." && pwd -P)"
 rubric_file="$dir/../../agents/claude-reviewer.md"
 
 # Model and effort come from roster.conf at the repo root — the single place

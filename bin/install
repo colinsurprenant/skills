@@ -34,7 +34,7 @@
 # Usage: bin/install [--codex] [--opencode] [--copilot] [--all]
 set -uo pipefail
 
-repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
+repo="$(CDPATH='' cd -P -- "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 
 do_codex=0; do_opencode=0; do_copilot=0
 for arg in "$@"; do
@@ -57,34 +57,7 @@ OK="  ok  "; NO="  --  "
 tilde='~'
 row() { printf '  %-44s %s %s\n' "${1/#$HOME/$tilde}" "$2" "${3:-}"; }
 
-# Stricter than doctor's into-this-clone test: a link counts only if it
-# resolves to exactly the documented source. A link to some other file,
-# even one inside this clone, is left alone and reported like any other
-# occupant.
-links_to() { # links_to <link> <absolute expected source>
-  [ -L "$1" ] || return 1
-  t="$(readlink "$1")"
-  case "$t" in /*) ;; *) t="$(dirname "$1")/$t" ;; esac
-  [ "$(cd "$(dirname "$t")" 2>/dev/null && pwd -P)/$(basename "$t")" = "$2" ]
-}
-
-# True if <link> is a symlink naming exactly "$repo/<old target>", the path a
-# pre-rename install created. That target is dangling by construction, so only
-# its directory is resolved, physically; a link whose directory does not
-# resolve, or that names anything else (another clone, a live file in this one,
-# a `..` escape), is not ours. Same test as bin/doctor's stale-link row.
-is_pre_rename_link() { # is_pre_rename_link <link> <repo-relative old target>
-  local t d
-  [ -L "$1" ] || return 1
-  t="$(readlink "$1")"
-  case "$t" in
-    /*) ;;
-    *) d="$(CDPATH='' cd -P -- "$(dirname "$1")" 2>/dev/null && pwd -P)" || return 1
-       t="$d/$t" ;;
-  esac
-  d="$(CDPATH='' cd -P -- "$(dirname "$t")" 2>/dev/null && pwd -P)" || return 1
-  [ "$d/$(basename "$t")" = "$repo/$2" ]
-}
+. "$repo/bin/lib/links.sh" || exit 1
 
 # The delegate-build rename left three links under ~/.claude that name paths
 # this clone no longer has. Remove each one that still names its old target;
@@ -93,9 +66,7 @@ is_pre_rename_link() { # is_pre_rename_link <link> <repo-relative old target>
 # is left alone without comment.
 migrate_pre_rename() {
   local pair old dst found=0
-  for pair in skills/opus-build:opus-build \
-              agents/opus-builder.md:agents/opus-builder.md \
-              agents/opus-reviewer.md:agents/opus-reviewer.md; do
+  for pair in "${pre_rename_links[@]}"; do
     old="${pair%%:*}"; dst="$HOME/.claude/$old"
     is_pre_rename_link "$dst" "${pair#*:}" || continue
     found=1
@@ -216,8 +187,17 @@ else
       codex_rows "$c_out" "$c_rc"
     fi
   else
-    c_out="$("$repo/bin/roster-render" --codex "$codex_dir" --refresh --check 2>&1)" || true
-    if [ -n "$c_out" ]; then
+    c_out="$("$repo/bin/roster-render" --codex "$codex_dir" --refresh --check 2>&1)"; c_rc=$?
+    # Exit 1 is drift, expected in files another clone generated. Anything
+    # above it is a fault in this clone's roster.conf or agents/*.md, which
+    # the "not refreshed" row would hide, so show roster-render's own words.
+    if [ "$c_rc" -gt 1 ]; then
+      echo
+      echo "Codex agent files"
+      while IFS= read -r line; do
+        [ -n "$line" ] && row "bin/roster-render" "$NO" "$line"
+      done <<< "$c_out"
+    elif [ -n "$c_out" ]; then
       echo
       echo "Codex agent files"
       row "$codex_dir" "$NO" "not refreshed: they belong to another clone, or ~/.agents/skills/delegate-build does not link to this one"

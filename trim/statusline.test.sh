@@ -15,7 +15,7 @@ set -u
 
 command -v node >/dev/null 2>&1 || { echo "statusline.test: node not found" >&2; exit 127; }
 
-dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+dir="$(CDPATH='' cd -P -- "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 S=${STATUSLINE:-$dir/statusline.js}
 [ -r "$S" ] || { echo "statusline.test: cannot read $S" >&2; exit 66; }
 
