@@ -16,7 +16,7 @@ set -uo pipefail
 deep=0
 [ "${1:-}" = "--deep" ] && deep=1
 
-repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
+repo="$(CDPATH='' cd -P -- "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 
 ok=0; req_missing=0; opt_missing=0
 required=0
@@ -30,33 +30,7 @@ miss() {
   if [ "$required" = 1 ]; then req_missing=$((req_missing+1)); else opt_missing=$((opt_missing+1)); fi
 }
 
-# A link counts only if it resolves to exactly its documented target; a link
-# to some other file, even inside this clone, silently serves different
-# content and is exactly the drift this check exists to catch.
-links_to() { # links_to <link> <absolute expected target>
-  [ -L "$1" ] || return 1
-  t="$(readlink "$1")"
-  case "$t" in /*) ;; *) t="$(dirname "$1")/$t" ;; esac
-  [ "$(cd "$(dirname "$t")" 2>/dev/null && pwd -P)/$(basename "$t")" = "$2" ]
-}
-
-# True if <link> is a symlink naming exactly "$repo/<old target>", the path a
-# pre-rename install created. That target is dangling by construction, so only
-# its directory is resolved, physically; a link whose directory does not
-# resolve, or that names anything else (another clone, a live file in this one,
-# a `..` escape), is not ours. Same test as bin/install's migration.
-is_pre_rename_link() { # is_pre_rename_link <link> <repo-relative old target>
-  local t d
-  [ -L "$1" ] || return 1
-  t="$(readlink "$1")"
-  case "$t" in
-    /*) ;;
-    *) d="$(CDPATH='' cd -P -- "$(dirname "$1")" 2>/dev/null && pwd -P)" || return 1
-       t="$d/$t" ;;
-  esac
-  d="$(CDPATH='' cd -P -- "$(dirname "$t")" 2>/dev/null && pwd -P)" || return 1
-  [ "$d/$(basename "$t")" = "$repo/$2" ]
-}
+. "$repo/bin/lib/links.sh" || exit 1
 
 check_cmd() {
   if have "$2"; then row "$1" "$OK" "$(command -v "$2")"; ok=$((ok+1)); return 0
@@ -134,9 +108,7 @@ check_link "$HOME/.claude/commands/iterate.md" commands/iterate.md
 # name listed. Anything else at those paths is not ours, and bin/install leaves
 # it alone too. A clean state is one summary row, a stale link is one row each.
 stale=0
-for pair in skills/opus-build:opus-build \
-            agents/opus-builder.md:agents/opus-builder.md \
-            agents/opus-reviewer.md:agents/opus-reviewer.md; do
+for pair in "${pre_rename_links[@]}"; do
   old_link="$HOME/.claude/${pair%%:*}"
   if is_pre_rename_link "$old_link" "${pair#*:}"; then
     row "${old_link/#$HOME/$tilde}" "$NO" "stale pre-rename link; run bin/install"; miss; stale=1

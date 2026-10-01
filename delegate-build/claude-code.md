@@ -51,6 +51,13 @@ both hold regardless of session settings.
 
 Effort: builders run at `BUILDER_EFFORT` from `roster.conf`.
 
+SKILL.md's cycle-two "one narrow correction to the same builder" goes through
+`SendMessage` to that builder's agent ID: the send resumes the finished agent
+from its transcript with its context intact, where a new Agent call starts
+fresh (observed on Claude Code 2.1.286). So dispatch the cycle-two fix order
+as a plain Agent call, whose result carries the ID; the Workflow script above
+returns report text only.
+
 ## Phase 4 — Breadth review
 
 Stakes: the escalation is `/code-review`, described at the end of the lane

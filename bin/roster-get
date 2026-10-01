@@ -16,7 +16,7 @@
 # that file would hit it anyway.
 set -euo pipefail
 
-repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
+repo="$(CDPATH='' cd -P -- "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 file="$repo/roster.conf"
 
 # Keys allowed to hold an empty value. Empty is a real setting for these (see
