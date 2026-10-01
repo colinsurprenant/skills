@@ -70,7 +70,8 @@ A long build outgrows one context window, so the build loop is split:
 judgment (planning, review) stays hot on the main loop, implementation
 volume goes to fresh builders at the roster's pinned model and effort, and
 breadth review runs on external harnesses, under OS-level confinement (see
-Sandboxing).
+Sandboxing). The in-session `claude-reviewer` fallback, used when srt or
+every lane is missing, runs under Claude Code's own permission checks instead.
 
 - **[delegate-build/](delegate-build/SKILL.md)**: the split build workflow,
   invoked explicitly for builds that span more than one session. Plan and
@@ -127,7 +128,8 @@ and supervision rather than model goodwill:
   repo readable but not writable, writes confined to OpenCode's own state
   dirs and temp space, network confined to the Kimi API and OpenCode's model
   catalogs. Fails closed when srt is missing rather than degrading to an
-  unsandboxed run.
+  unsandboxed run. The repo stays read-only only outside that temp space: a
+  repo under `/tmp`, `/private/tmp` or `/private/var/folders` is writable.
 - The **GPT reviewer**, reached through Codex from a Claude Code main loop,
   is OS-sandboxed read-only by its plugin's own default, pinned in the
   delegate-build skill's [claude-code.md](delegate-build/claude-code.md) so a
@@ -152,10 +154,11 @@ and supervision rather than model goodwill:
   it is opt-in and off in my settings: it trades prompts for a boundary, which
   pays off only when your work mostly stays inside one.
 
-Every lane's model and effort is pinned from `roster.conf` at the repo root, the
-one place either is set, and the wrappers read it at launch rather than
-carrying a slug of their own. [ROSTER.md](ROSTER.md) explains the roles and
-which key feeds which lane.
+Each review lane's model and effort is pinned from `roster.conf` at the repo
+root, the one place either is set (ROSTER.md's escalation row, `/code-review`
+at `max`, is not a lane and has no pin), and the wrappers read it at launch
+rather than carrying a slug of their own. [ROSTER.md](ROSTER.md) explains the
+roles and which key feeds which lane.
 
 The premise: a git worktree is merge hygiene, not a security boundary. Any
 agent that runs `npm install` or a test suite executes third-party code with

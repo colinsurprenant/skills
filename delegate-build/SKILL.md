@@ -157,7 +157,9 @@ ask first), or skip the phase.
 - **Kimi (via OpenCode)**: the wrapper pins the model (and optional `--variant`
   effort) from `roster.conf` and runs `opencode run` under srt: writes
   confined to OpenCode's state dirs and temp space, network to the Kimi API
-  and model catalogs, repo read-only. If srt is missing the wrapper refuses;
+  and model catalogs, repo read-only unless it sits in that temp space
+  (`/tmp`, `/private/tmp`, `/private/var/folders`). If srt is missing the
+  wrapper refuses;
   report it and let the user decide, never fall back to a bare
   `opencode run`. "Error starting FSEvents stream" is benign sandbox noise.
   Gotcha: `opencode run` can exit 0 with NO final message when
