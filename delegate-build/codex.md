@@ -68,14 +68,19 @@ finished or errored worker is unloaded automatically when a new spawn needs
 its slot. Codex's default limit is 4 agents including this main loop, so at
 most 3 workers at once; Codex's own prompt states the count, and if it
 differs, follow it. Independent orders spawn in the same turn, up to that
-limit. On an agent-limit error, wait for a finisher, then retry the spawn.
+limit. On an agent-limit error (`agent thread limit reached`), wait for a
+finisher, then retry the spawn.
 
 `wait_agent` returns on the FIRST finisher and also on timeout: a timeout is
 not a report, so keep waiting until every spawned worker has delivered its
 final message. A worker that ends without one is a Phase 3 finding.
 
 SKILL.md's cycle-two "one narrow correction to the same builder" goes through
-`followup_task` to that worker's `task_name`.
+`followup_task` to that worker's `task_name`. A follow-up to a finished worker
+needs a free slot, like a spawn: with every worker slot running, it fails with
+`agent thread limit reached` (observed on Codex 0.159.2). Keep a slot free
+between a cycle-two build and its correction, and on that error wait for a
+running worker to finish, then retry the follow-up.
 
 Codex spawns only when explicitly told to: this skill is that instruction, so
 never do an order's work inline beyond SKILL.md's under-10-minute rule.
