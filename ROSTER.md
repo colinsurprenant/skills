@@ -1,4 +1,4 @@
-# ROSTER — who does what, on this machine
+# ROSTER: who does what, on this machine
 
 Directives and skills name ROLES. This file explains the roles, the access
 path each one is reached through, and the logic for choosing who fills it.
@@ -52,7 +52,7 @@ on unchecked: the orchestrator reviews each report, the lanes review the diff,
 and triage closes what they find. Effort is still set per role, which is how a
 volume-tier builder can run higher than the scout.
 
-Reviewer portfolio (a set, not a slot — see Selection logic):
+Reviewer portfolio (a set, not a slot; see Selection logic):
 
 | Lane | Model @ effort | Access path | Billing |
 | --- | --- | --- | --- |
@@ -73,11 +73,11 @@ inside Codex's sandbox.
 
 `$KIMI_REVIEWER_VARIANT` is opencode's provider-specific reasoning effort and may be
 empty, which means take the provider default. What value form each key accepts
-— alias, full model id, provider slug, effort level — is documented per key in
+(alias, full model id, provider slug, effort level) is documented per key in
 `roster.conf`, along with the policy behind it: the Anthropic keys hold aliases
 so the whole roster floats to the latest release together.
 
-## Selection logic — two kinds, not one
+## Selection logic: two kinds, not one
 
 Singleton roles (builder, researcher, scout) are capability-driven: pick the
 single best cost-adjusted model. Monoculture is fine. Changing one is a
@@ -96,9 +96,9 @@ however accurate it is.
 
 One surface to edit, two to run, and `bin/install` to deliver the Codex copies:
 
-- `roster.conf` — the only file you edit. Every model and effort on this
+- `roster.conf`: the only file you edit. Every model and effort on this
   machine is one line in it.
-- `bin/roster-render` — writes those values into `agents/*.md` frontmatter
+- `bin/roster-render`: writes those values into `agents/*.md` frontmatter
   (`model:`, `effort:`) for the Agent-tool roles. `--codex <dir>` generates the
   Codex agent files (`delegate-builder.toml`, `scout.toml`, `researcher.toml`)
   from the `CODEX_*` keys and the same `agents/*.md` bodies into the directory
@@ -111,7 +111,7 @@ One surface to edit, two to run, and `bin/install` to deliver the Codex copies:
   generated files it is silent. `--claude <dir>` stages pinned copies of the
   Claude agents, and `--codex <dir>` the Codex files, into a directory for a
   staged run.
-- `bin/doctor` — verifies the rendered agents against `roster.conf`, checks the
+- `bin/doctor`: verifies the rendered agents against `roster.conf`, checks the
   review lanes against what is actually installed, and prints the pins each
   lane will use. It also verifies the installed Codex agent files whole (a
   changed body or description is drift, not only a changed model or effort).
@@ -119,9 +119,10 @@ One surface to edit, two to run, and `bin/install` to deliver the Codex copies:
   prints one optional "delegate-build not installed for Codex" row instead.
 
 Nothing parses `roster.conf` itself: `bin/roster-get` is the one reader every
-consumer goes through, so validation, duplicate keys, empty values and error
-text have a single definition and a broken roster fails identically in
-roster-render, doctor and both review wrappers.
+consumer goes through (`--file <path>` points it at another roster, for tests),
+so validation, duplicate keys, empty values and error text have a single
+definition and a broken roster fails identically in roster-render, doctor and
+both review wrappers.
 
 Everything else reads `roster.conf` at run time and needs no sync: the
 delegate-build GPT lane resolves it through the skill symlink before dispatching
@@ -134,7 +135,7 @@ so a `CODEX_*` edit reaches Codex only on the next `bin/install` run from the
 clone that `~/.agents/skills/delegate-build` links into, and doctor reports the
 drift until then.
 
-## Combo log — the evidence stream
+## Combo log: the evidence stream
 
 Roster decisions run on recorded outcomes, not memory. Capture is
 unconditional; analysis is on demand (a `researcher` dispatch over the log
@@ -144,6 +145,9 @@ Emit one note per delegate-build run at Phase 5 close, and one for any notable
 singleton outcome (a bounced work order, a researcher spot-check result):
 
     director emit --type note --area combo-log "<task>: build=<model> orders=<n> bounced=<n> fix_cycles=<n>; lane <name>: submitted=<n> accepted=<n> rejected=<n> unique=<n>; lane <name>: ...; skips=<lane:kind|none>; note=<one line>"
+
+`director` is a separate session-coordination CLI that is not part of this
+repo; the combo log and the swap procedure's `director emit` step depend on it.
 
 Record facts (counts and one-line reasons), never derived metrics; metrics
 are recomputed at analysis time from the raw notes, so the record shape can
