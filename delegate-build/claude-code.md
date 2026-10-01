@@ -57,7 +57,7 @@ Stakes: the escalation is `/code-review`, described at the end of the lane
 list below.
 
 Resolve `bin/doctor` through this skill's symlink:
-`"$(dirname "$(readlink -f ~/.claude/skills/delegate-build)")/bin/doctor"`.
+`"$(cd -P ~/.claude/skills/delegate-build/.. && pwd)/bin/doctor"`.
 
 The lane of this loop's own lineage is the Claude lane, opt-in through the
 Claude bullet below. With no external lane available, the in-session fallback
@@ -68,7 +68,7 @@ is the `claude-reviewer` agent.
   modify files": the rescue agent is fix-capable and edits unless told not to.
   Model pin, MUST: get `GPT_REVIEWER_MODEL` and `GPT_REVIEWER_EFFORT` through the
   one reader, never by reading `roster.conf` yourself:
-  `"$(dirname "$(readlink -f ~/.claude/skills/delegate-build)")/bin/roster-get GPT_REVIEWER_MODEL"`
+  `"$(cd -P ~/.claude/skills/delegate-build/.. && pwd)/bin/roster-get" GPT_REVIEWER_MODEL`
   and the same for `GPT_REVIEWER_EFFORT`; then put `--model <value> --effort <value>`
   in the request text so the rescue agent forwards them verbatim to
   `codex-companion.mjs task` (verified in the plugin's `agents/codex-rescue.md`

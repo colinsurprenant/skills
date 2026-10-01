@@ -86,7 +86,8 @@ each generated agent file, checked whole against `roster.conf` and the
 `agents/*.md` bodies (drift names `bin/install --codex` as the fix). With
 `codex` on PATH and neither that link nor any generated file, they collapse to
 one row saying delegate-build is not installed for Codex; without `codex` on
-PATH, one row says Codex is not installed.
+PATH, the link row stays and the agent-file rows give way to one row saying
+Codex is not installed.
 `bin/doctor --deep` additionally verifies the OpenCode model slug, which needs
 network. Unmet optional checks are informational: they tell you which lane is
 retired, not that something is broken. The exit status scores only the

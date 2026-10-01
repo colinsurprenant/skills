@@ -178,6 +178,6 @@ orchestration.
 
 `bin/doctor` and `bin/roster-get` are not on PATH. Resolve doctor through this
 skill's symlink:
-`"$(dirname "$(readlink -f ~/.agents/skills/delegate-build)")/bin/doctor"`.
+`"$(cd -P ~/.agents/skills/delegate-build/.. && pwd)/bin/doctor"`.
 Read the roster only through `bin/roster-get` beside it, never by reading
 `roster.conf` yourself.
