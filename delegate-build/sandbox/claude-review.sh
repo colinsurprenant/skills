@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Sandboxed Claude review lane for delegate-build Phase 4 — the STANDARD Claude
-# review path; the in-session `claude-reviewer` agent is the fallback for
-# machines without srt. Wraps headless `claude -p` (model and effort pinned
+# review path; under Claude Code the in-session `claude-reviewer` agent is the
+# fallback for machines without srt (a Codex main loop has no such fallback and
+# goes without the lane). Wraps headless `claude -p` (model and effort pinned
 # from roster.conf) in srt, mirroring kimi-review.sh: repo readable but not
 # writable, writes confined to Claude's own state dir + temp space, network to
 # the Anthropic API only. Two boundaries: the tool allowlist keeps the reviewer
@@ -32,9 +33,10 @@ fi
 
 # pwd -P: the rubric and roster live outside the skill dir, so the repo path
 # must resolve even when this runs through the ~/.claude/skills/delegate-build
-# symlink. Resolve the script dir physically FIRST, then walk up: appending
-# `/../..` to an unresolved dirname is canonicalized textually and would land
-# in ~/.claude/skills instead of the repo.
+# symlink (Claude Code) or the ~/.agents/skills/delegate-build symlink (Codex).
+# Resolve the script dir physically FIRST, then walk up: appending `/../..` to
+# an unresolved dirname is canonicalized textually and would land in
+# ~/.claude/skills or ~/.agents/skills instead of the repo.
 dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 root="$(cd "$dir/../.." && pwd -P)"
 rubric_file="$dir/../../agents/claude-reviewer.md"

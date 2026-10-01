@@ -1,21 +1,29 @@
 ---
 name: delegate-build
-description: Split build workflow for a Fable or Opus main loop — plan and review here, implement on fresh builders at the roster's pinned model and effort, breadth-review on external lanes. Use only when the user invokes /delegate-build or asks for it by name, however large the change; the split keeps the main loop's plan and review state hot across a build that outlives one context window or spans several sessions, while builders carry the bulk. Not for work that fits in one sitting (measured 2026-09 in M8, where on a one-session task the split cost about four times solo for equal quality), single-file changes, Q&A, investigation, or sessions on other models.
+description: Split build workflow for a judgment-tier main loop (Fable or Opus in Claude Code, GPT-6 Astra in Codex) — plan and review here, implement on fresh builders at the roster's pinned model and effort, breadth-review on external lanes. Use only when the user invokes /delegate-build in Claude Code or $delegate-build in Codex, or asks for it by name, however large the change; the split keeps the main loop's plan and review state hot across a build that outlives one context window or spans several sessions, while builders carry the bulk. Not for work that fits in one sitting (measured 2026-09 in M8, where on a one-session task the split cost about four times solo for equal quality), single-file changes, Q&A, investigation, or sessions on other models.
 ---
 
 # delegate-build — plan here, build on fresh builders, review here
+
+Before anything else, read the mechanics file for your harness, beside this
+SKILL.md: `claude-code.md` in Claude Code, `codex.md` in Codex. It holds the
+main-loop model gate, which you apply BEFORE announcing anything, and every
+dispatch and lane-invocation mechanic this file leaves out. This file names
+roles (builder, scout, researcher, review lanes by lineage); the mechanics
+file says which agent and which command fills each. If the SKILL.md text you
+were given looks truncated, read SKILL.md from disk.
 
 Why this exists: context continuity. A long build fills a main loop with
 reads, edits, and test output until it cycles into fresh sessions that
 re-orient from a handoff. Here the plan and judgment state stay hot on the
 main loop across the workstream while fresh builders at the roster's pinned
 model and effort carry the bulk, whatever model runs the main loop. It does
-not save tokens: in M8 (parley, 2026-09) the Fable main loop alone cost more
-than a Fable solo run of the same task. Never advertise a saving.
+not save tokens: in M8 (parley, 2026-09) the main loop alone cost more
+than a solo run of the same task on the same model. Never advertise a saving.
 
-On any other model, say so and skip this workflow: Phases 3 and 5 put review
-and triage on the main loop, and running those on a weaker model than the
-builders is a different workflow.
+The model gate exists because Phases 3 and 5 put review and triage on the main
+loop, and running those on a weaker model than the builders is a different
+workflow; when the gate fails, say so and skip this workflow.
 
 On activation, announce it in plain text ("delegate-build is active") and
 briefly narrate phase transitions (dispatching to builders, returning for
@@ -24,18 +32,14 @@ review).
 Standing rules while active:
 
 - Keep this main loop lean. Don't bulk-read files here; delegate exploration to
-  `scout` agents and keep only conclusions.
-- Never use `fork` subagents for build work: a fork inherits this session's
-  model and whole context and ignores the model override. Build agents are
-  fresh `delegate-builder` agents.
+  the scout role and keep only conclusions.
 
 ## Phase 1 — Plan (here, on the main loop)
 
 1. Resolve ALL ambiguity with the user now: builders are headless, so anything
    unresolved becomes a guess baked into code.
-2. Delegate exploration to the `scout` agent. Its frontmatter pins model and
-   effort, rendered from `roster.conf` by `bin/roster-render` (`SCOUT_MODEL` /
-   `SCOUT_EFFORT`), so no per-dispatch override is needed.
+2. Delegate exploration to the scout role. Its pinned model and effort come
+   from `roster.conf`, so no per-dispatch override is needed.
 3. Write the work orders. Each is self-contained:
    - **Goal** — what to build and why (one sentence of intent).
    - **Scope** — files/modules to touch; what is explicitly out of scope.
@@ -49,7 +53,7 @@ Standing rules while active:
      behavior). `none` is legal and turns the sweep off.
 4. When the work is protocol-, trust-, or spec-to-prose-shaped (rules naming
    who may do what, text other documents must agree with, prose another party
-   will execute), dispatch the `researcher` agent to attack the ORDER, not the
+   will execute), dispatch the researcher role to attack the ORDER, not the
    code: what it lets a builder get wrong, which rule keys on a peer-supplied
    input, which sibling documents drift when it lands. Make it a Validate order
    whose claim is "a builder executing this order as written produces what the
@@ -71,45 +75,26 @@ orientation cost (~1.4 USD measured in M8) and each dispatch costs this loop
 4 to 13 messages of coordination.
 
 Write less. An order states what to do, what to touch, and what to report;
-never restate context the builder can read itself, AGENT_BEHAVIOR.md (it
-reaches builders via the @-import in CLAUDE.global.md, routed to SHARED), or
-the reporting contract (`delegate-builder` carries it). This loop's own prose
-(plans, orders, reviews, triage) is the dominant content it admits, and it
-recurs every turn. Scope runs both ways: downward, an order carries exactly
+never restate context the builder can read itself, AGENT_BEHAVIOR.md (builders
+already carry it), or the reporting contract (the builder role carries it).
+This loop's own prose (plans, orders, reviews, triage) is the dominant content
+it admits, and it recurs every turn. Scope runs both ways: downward, an order carries exactly
 what its task's inputs require, no padding; upward, an order whose deliverable
 is a synthesis names the goal it must answer, and the deliverable answers it
 in target form, never as a concatenation of raw inputs.
 
 ## Phase 2 — Build (fresh builders at the roster's pinned model and effort)
 
-Dispatch each order to the `delegate-builder` agent. Its frontmatter pins model
-and effort, rendered from `roster.conf` by `bin/roster-render` (`BUILDER_MODEL` /
-`BUILDER_EFFORT`), so both hold regardless of session settings.
+Dispatch each order to the builder role. Its pin holds regardless of session
+settings. The mechanics file says how to dispatch, and which agents must never
+take build work.
 
-- Normally: plain Agent calls with `subagent_type: "delegate-builder"` and the
-  order as the prompt; independent orders in a single message so they run in
-  parallel.
-- Staged batches: the Workflow tool (this skill is your Workflow opt-in):
-
-      export const meta = {
-        name: 'delegate-build-dispatch',
-        description: 'Run build work orders on delegate-builder agents',
-        phases: [{ title: 'Build' }],
-      }
-      const results = await parallel(args.orders.map((o, i) => () =>
-        agent(o, { agentType: 'delegate-builder', label: `build:${i}`, phase: 'Build' })
-      ))
-      return results.map((r, i) => r ?? `ORDER ${i}: NO RESULT — agent died or returned nothing`)
-
-  Pass orders via `args: { orders: [...] }`. Never drop a failed order
-  silently; a missing result is a Phase 3 finding.
-- Never a bare `general-purpose` agent (or a fork): it inherits the session
-  model and lacks `delegate-builder`'s effort pin and reporting contract.
+Never drop a failed order silently; a missing result is a Phase 3 finding.
 
 Serialize orders that touch the same files; worktree isolation only defers the
 merge to a step nobody owns.
 
-Effort: builders run at `BUILDER_EFFORT` from `roster.conf`; don't override it
+Effort: builders run at the roster's pinned effort; don't override it
 downward per order. A fixed pin on the first pass is cheaper than a redispatch
 loop through this main loop.
 
@@ -124,14 +109,14 @@ reads of the lines it names, never the whole diff (measured in M8 to hold).
   under the same obligations an order would carry: the step 4 gate when it
   changes protocol, trust, or spec prose; the restatement sweep; and the
   verification the order would have named.
-- Anything larger: a narrow fix order to `delegate-builder`; don't absorb build
+- Anything larger: a narrow fix order to the builder role; don't absorb build
   work here. A fix order has the full Phase 1 shape, **Touches** included,
   scoped to the findings it fixes, and takes the step 4 gate when the fix
   changes protocol, trust, or spec prose. A builder-reported blocker on an editable out-of-scope
   restatement is resolved before work proceeds, by a fix order that widens
   scope or amends the rule, never by shipping the drift; frozen and snapshot
   hits stay report-only.
-- Large diff (several hundred lines or more): dispatch the `researcher` agent
+- Large diff (several hundred lines or more): dispatch the researcher role
   for a criteria-by-criteria verification report (a Validate order: the claim is
   that the diff meets each acceptance criterion) and review that instead.
 
@@ -147,49 +132,29 @@ SHA and its base: the merge base with the PR's target branch on the breadth
 pass, the breadth-pass head on the confirming pass. Every lane request carries
 both. Every INSTALLED no-cost lane runs once on the breadth head (the Claude
 lane only if the user opted in); the confirming pass runs the lane set Phase 5
-names. No fixes land between lanes.
+names. The lane of this loop's own lineage is opt-in where the mechanics file
+offers a path to it, and otherwise skipped with kind `<lane>:own-lineage`. No
+fixes land between lanes.
 
-Stakes decide whether this phase runs and whether to escalate to /code-review,
-never which no-cost lanes run: none of them costs Anthropic tokens.
+Stakes decide whether this phase runs and whether to escalate to the expensive
+review the mechanics file names, if it names one, never which no-cost lanes
+run: none of them costs Anthropic tokens.
 
 `roster.conf` at the repo root is the single place models and efforts are set.
-`bin/doctor` reports which lanes are live; it is not on PATH, so resolve it
-through this skill's symlink:
-`"$(dirname "$(readlink -f ~/.claude/skills/delegate-build)")/bin/doctor"`. An
-absent tool is a legitimate lane skip only as a VERIFIED fact: before calling
-a lane absent, run the check in THIS session (doctor, or the lane's own
-`command -v` / plugin lookup) and name it. In the announcement, name every
-skipped lane and its kind: "not installed" and "installed but the harness is
-down" are different facts. Dropping an INSTALLED no-cost lane is a judgment
-call the user can veto, never silent scaling. If no external lane is available,
-say so and offer the in-session `claude-reviewer` agent (Anthropic-billed, ask
-first) or skip the phase.
+`bin/doctor` reports which lanes are live; it is not on PATH, so the mechanics
+file gives the path that resolves it. An absent tool is a legitimate lane skip
+only as a VERIFIED fact: before calling a lane absent, run the check in THIS
+session (doctor, or the lane's own `command -v` / plugin lookup) and name it.
+In the announcement, name every skipped lane and its kind: "not installed",
+"installed but the harness is down", "own-lineage" and "denied" (its run was
+refused by the approval step) are different facts.
+Dropping an INSTALLED no-cost lane is a judgment call the user can veto, never
+silent scaling. If no external lane is available, say so and offer the
+in-session fallback the mechanics file names, if it names one (Anthropic-billed,
+ask first), or skip the phase.
 
-- **GPT (via Codex)**: `/codex:rescue` with a review request naming the base and
-  head (ChatGPT plan billing). Frame it as review-only, "report findings; do not
-  modify files": the rescue agent is fix-capable and edits unless told not to.
-  Model pin, MUST: get `GPT_REVIEWER_MODEL` and `GPT_REVIEWER_EFFORT` through the
-  one reader, never by reading `roster.conf` yourself:
-  `"$(dirname "$(readlink -f ~/.claude/skills/delegate-build)")/bin/roster-get GPT_REVIEWER_MODEL"`
-  and the same for `GPT_REVIEWER_EFFORT`; then put `--model <value> --effort <value>`
-  in the request text so the rescue agent forwards them verbatim to
-  `codex-companion.mjs task` (verified in the plugin's `agents/codex-rescue.md`
-  and `commands/rescue.md`; unset, the lane tracks `~/.codex/config.toml`).
-  Sandbox: the plugin dispatches with `sandbox: "read-only"` +
-  `approvalPolicy: "never"` by default (codex.mjs, plugin v1.0.6), OS-enforced
-  via Seatbelt but not absolute: Codex runs rule-approved commands OUTSIDE the
-  sandbox, so a `~/.codex/rules` allowlist entry punches through (seen with
-  `director emit`). Director is a separate coordination CLI; without it the
-  kill costs nothing. The kill is prompt-enforced because the plugin owns the
-  spawn: tell the rescue agent to prefix the runtime invocation with `DIRECTOR_BIN=/dev/null` (every
-  hook shim honors it), and include in the request: "Never run the `director`
-  CLI or any other state-writing command; deliver your complete findings as
-  your final message." After a plugin update, re-check the sandbox defaults; a
-  change is a roster-level change to surface to the user.
-- **Kimi (via OpenCode)**: via Bash with `run_in_background` (or a long
-  explicit timeout),
-  `~/.claude/skills/delegate-build/sandbox/kimi-review.sh "<review prompt naming
-  the base and head>"`. The wrapper pins the model (and optional `--variant`
+- **GPT**: the mechanics file says how to invoke it, pin it and confine it.
+- **Kimi (via OpenCode)**: the wrapper pins the model (and optional `--variant`
   effort) from `roster.conf` and runs `opencode run` under srt: writes
   confined to OpenCode's state dirs and temp space, network to the Kimi API
   and model catalogs, repo read-only. If srt is missing the wrapper refuses;
@@ -200,21 +165,14 @@ first) or skip the phase.
   instruct the reviewer: no `cd`, read-only tools, and it MUST end with the
   deliverable. The wrapper tees stdout to a temp report file (path on stderr
   at launch), so a finished review survives a killed run.
-- **Claude (OPT-IN — costs Anthropic tokens)**: via Bash with
-  `run_in_background` (or a long explicit timeout),
-  `~/.claude/skills/delegate-build/sandbox/claude-review.sh "<review prompt naming
-  the base and head>"`. The wrapper runs headless `claude -p` under srt, pinned
-  to the model and effort in `roster.conf`, read-only at two layers (tool
-  allowlist + OS boundary), all MCP disabled, the same two-layer Director kill
-  as the Kimi lane. Its rubric is the body of `agents/claude-reviewer.md`, and
-  it tees stdout like Kimi. If srt is missing, dispatch the `claude-reviewer`
-  agent in-session instead (same rubric and pins, classifier-gated rather than
-  OS-sandboxed) and say so. It bills Anthropic tokens, so it is not in the
-  default roster: offer it when the user wants an Anthropic-grade pass without
-  /code-review.
-- **`/code-review:code-review`** is the EXPENSIVE escalation, billed
-  Anthropic-side. Reserve it for high-stakes diffs the user explicitly wants
-  deep-reviewed.
+- **Claude (OPT-IN — costs Anthropic tokens)**: the wrapper runs headless
+  `claude -p` under srt, pinned to the model and effort in `roster.conf`,
+  read-only at two layers (tool allowlist + OS boundary), all MCP disabled, the
+  same two-layer Director kill as the Kimi lane. Its rubric is the body of
+  `agents/claude-reviewer.md`, and it tees stdout like Kimi. If srt is missing,
+  take the in-session fallback the mechanics file names and say so; with none,
+  the lane is unavailable, and say so. It bills Anthropic tokens, so it is not
+  in the default roster: offer it when the user wants an Anthropic-grade pass.
 
 Skipping this phase is allowed for low-stakes changes (Phase 3 plus passing
 tests), but announce it like a lane skip: say you are skipping Phase 4 and
@@ -223,7 +181,7 @@ name what makes the change low-stakes (size, blast radius, reversibility).
 ## Phase 5 — Triage and close (here, on the main loop)
 
 Adjudicate every lane's findings together (expect noise), dispatch the accepted
-fixes to `delegate-builder` as cycle one (one fix order, or a few that don't
+fixes to the builder role as cycle one (one fix order, or a few that don't
 overlap), commit the fix tree, and announce the base (the breadth head) and the new head.
 
 Then run ONE confirming pass: only the lanes whose findings were accepted,
@@ -257,9 +215,3 @@ accepted / rejected / unique-catch counts, plus builder facts (work orders,
 bounces, fix cycles) and any skips with their kind. The record shape lives in
 `ROSTER.md`. Future roster decisions run on this log; a run that skips it
 leaves no sample.
-
-## Session effort
-
-- Session effort for the Fable main loop is the user's call: `high` for
-  day-to-day orchestration, `xhigh` for sessions centered on hard design work.
-  Thinking tokens bill as output tokens, so effort is a real cost lever.

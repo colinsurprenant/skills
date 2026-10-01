@@ -12,10 +12,15 @@ hardcoded paths. The persona is mine: fork and edit.
     bin/install
 
 To update later: `git pull`, then `bin/install` again. Pulled edits to
-skills and agents land live through the symlinks; the rerun exists only to
-create links a pull introduced (and to drop the pre-rename `opus-build`,
-`opus-builder` and `opus-reviewer` links if you have them), is a no-op
-otherwise, and ends with the doctor report either way.
+skills and agents land live through the symlinks, except the Codex agent files:
+those are generated copies (Codex refuses symlinked agent files) that reach
+Codex on the next `bin/install`, which refreshes the ones it generated earlier
+when `~/.agents/skills/delegate-build` links into this clone (otherwise one
+"not refreshed" row and nothing touched). The rerun also creates links a pull
+introduced (and drops the pre-rename `opus-build`, `opus-builder` and
+`opus-reviewer` links if you have them), is otherwise a no-op, and ends with
+the doctor report either way. It exits non-zero if a link cannot be created or,
+under a harness flag such as `--codex`, is refused.
 
 ## What's here
 
@@ -66,7 +71,14 @@ Sandboxing).
   sandboxed Claude lane). Lanes are named by model family, since the model
   inside a lane and its access path both change. The split buys context
   continuity, not a token saving: measured on a one-session task, it cost
-  more than a solo run for equal quality.
+  more than a solo run for equal quality. SKILL.md is the harness-neutral
+  core (roles, phases, order shape, lane policy);
+  [claude-code.md](delegate-build/claude-code.md) and
+  [codex.md](delegate-build/codex.md) hold each harness's mechanics:
+  dispatch, lane invocation, model gate, approvals. The main loop is Claude
+  Code (`/delegate-build`) or Codex (`$delegate-build`), with Codex agents
+  pinned from the `CODEX_*` keys; from Codex the GPT lane is the main loop's
+  own lineage and is not offered.
   [review-2026-07-27.md](delegate-build/review-2026-07-27.md) is the
   adversarial review from its first validation run (written when the skill
   was still named opus-build);
@@ -74,7 +86,9 @@ Sandboxing).
 - **[agents/delegate-builder.md](agents/delegate-builder.md)**,
   **[agents/claude-reviewer.md](agents/claude-reviewer.md)** and
   **[agents/scout.md](agents/scout.md)**: the pinned-model build, review and
-  scouting agents it dispatches to.
+  scouting agents it dispatches to. `bin/roster-render --codex <dir>` also
+  generates Codex copies of the builder, scout and researcher (not committed;
+  `bin/install --codex` installs them; see [SETUP.md](SETUP.md)).
 - **[commands/iterate.md](commands/iterate.md)**: the discovery-driven loop
   for fuzzy-scope work (frame, build, evaluate, decide). Its premise: in
   discovery work the spec is an output, written at convergence rather than
@@ -99,22 +113,29 @@ and supervision rather than model goodwill:
   repo readable but not writable, writes confined to OpenCode's own state
   dirs and temp space, network confined to the Kimi API. Fails closed when
   srt is missing rather than degrading to an unsandboxed run.
-- The **GPT reviewer**, reached through Codex, is OS-sandboxed read-only by
-  its plugin's own default, pinned in the delegate-build skill so a plugin
-  update that widens that default gets surfaced, not silently absorbed. The
-  lane is the plugin's `/codex:rescue` command, shipped by OpenAI rather than
-  defined here; its dedicated review commands are user-invocable only, so the
-  skill frames the rescue agent as review-only by prompt.
+- The **GPT reviewer**, reached through Codex from a Claude Code main loop,
+  is OS-sandboxed read-only by its plugin's own default, pinned in the
+  delegate-build skill's [claude-code.md](delegate-build/claude-code.md) so a
+  plugin update that widens that default gets surfaced, not silently absorbed.
+  The lane is the plugin's `/codex:rescue` command, shipped by OpenAI rather
+  than defined here; its dedicated review commands are user-invocable only, so
+  the skill frames the rescue agent as review-only by prompt.
 - The **Claude reviewer** gets the same treatment by
   [delegate-build/sandbox/claude-review.sh](delegate-build/sandbox/claude-review.sh),
   which is the standard Phase 4 Claude path. Sandboxing a reviewer while build
   subagents write files unsandboxed sounds inconsistent, but it is just least
   privilege: builders need write access to do the job and reviewers never do.
-- **Everything else**, the main loop and the build subagents included, runs
-  with Claude Code's own permission prompts. Its native Bash sandbox is
-  available and documented in [SETUP.md](SETUP.md), but it is opt-in and off
-  in my settings: it trades prompts for a boundary, which pays off only when
-  your work mostly stays inside one.
+- From a **Codex** main loop, workers inherit its workspace-write sandbox (Codex
+  cannot give a worker a narrower one), so the scout and researcher are
+  read-only by instruction only. The Kimi and Claude wrapper scripts run
+  escalated through Codex's own approval prompt, because srt cannot start
+  inside Codex's own sandbox, and re-confine themselves under srt once outside
+  it.
+- **Everything else** in a Claude Code session, the main loop and the build
+  subagents included, runs with Claude Code's own permission prompts. Its
+  native Bash sandbox is available and documented in [SETUP.md](SETUP.md), but
+  it is opt-in and off in my settings: it trades prompts for a boundary, which
+  pays off only when your work mostly stays inside one.
 
 Every lane's model and effort is pinned from `roster.conf` at the repo root, the
 one place either is set, and the wrappers read it at launch rather than

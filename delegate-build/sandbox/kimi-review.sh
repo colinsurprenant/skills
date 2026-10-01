@@ -26,8 +26,10 @@ fi
 
 # Resolve the script dir physically FIRST, then walk up: `dirname $0/../..`
 # would be canonicalized textually against the logical path and land in
-# ~/.claude/skills when this runs through the ~/.claude/skills/delegate-build
-# symlink. Two steps, both -P, reach the real repo root either way.
+# ~/.claude/skills or ~/.agents/skills (the skill dir is reached through the
+# ~/.claude/skills/delegate-build symlink from Claude Code and the
+# ~/.agents/skills/delegate-build symlink from Codex). Two steps, both -P,
+# reach the real repo root either way.
 dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 root="$(cd "$dir/../.." && pwd -P)"
 

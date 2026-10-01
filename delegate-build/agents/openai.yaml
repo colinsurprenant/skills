@@ -1,0 +1,3 @@
+# Explicit $delegate-build only, mirroring the Claude-side explicit-only rule.
+policy:
+  allow_implicit_invocation: false

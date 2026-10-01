@@ -6,7 +6,8 @@
 #
 # No model or effort is named in this script. roster.conf holds every value;
 # this script reads it and checks the surfaces (agents/*.md frontmatter, the
-# review lanes) against it. ROSTER.md is prose about roles, not a data source.
+# Codex agent files, the review lanes) against it. ROSTER.md is prose about
+# roles, not a data source.
 #
 # Usage: bin/doctor [--deep]
 #   --deep also probes provider model lists (needs network, can be slow).
@@ -144,6 +145,23 @@ done
 [ "$stale" = 1 ] || { row "pre-rename links" "$OK" "none"; ok=$((ok+1)); }
 required=0
 check_link "$HOME/.codex/AGENTS.md" AGENT_BEHAVIOR.md "optional: Codex CLI behavior file"
+# delegate-build for Codex is the skill link plus the generated agent files. On
+# a machine with codex but neither (nothing at the link path, and no file
+# bin/roster-render generated in ~/.codex/agents), it was never installed, and
+# one row says so instead of a missing link and three missing files.
+# roster-render --codex --refresh --check prints nothing unless a generated file
+# is there, so any output at all means one is.
+codex_skill="$HOME/.agents/skills/delegate-build"
+codex_unused=0
+if have codex && [ ! -e "$codex_skill" ] && [ ! -L "$codex_skill" ] \
+   && [ -z "$("$repo/bin/roster-render" --codex "$HOME/.codex/agents" --refresh --check 2>&1)" ]; then
+  codex_unused=1
+fi
+if [ "$codex_unused" = 1 ]; then
+  row "delegate-build not installed for Codex" "$NO" "optional: bin/install --codex"; miss
+else
+  check_link "$codex_skill" delegate-build "optional: delegate-build skill for Codex (bin/install --codex)"
+fi
 check_link "$HOME/.config/opencode/AGENTS.md" AGENT_BEHAVIOR.md "optional: OpenCode behavior file"
 check_link "$HOME/.copilot/copilot-instructions.md" AGENT_BEHAVIOR.md "optional: Copilot CLI behavior file"
 
@@ -151,8 +169,10 @@ echo
 echo "roster.conf — every model and effort on this machine"
 # roster.conf is the single place a value is set; this section keeps the
 # surfaces it feeds honest. The agent rows come from bin/roster-render --check,
-# which owns the role-to-file mapping; the lane rows echo the pins the
-# delegate-build wrappers read, so a swap that missed a wrapper shows up here.
+# which owns the role-to-file mapping; the Codex agent file rows come from
+# bin/roster-render --codex --check, which compares each whole file; the lane
+# rows echo the pins the delegate-build wrappers read, so a swap that missed a
+# wrapper shows up here.
 required=1
 if [ ! -f "$repo/roster.conf" ]; then
   row "roster.conf" "$NO" "missing; nothing binds a role to a model"; miss
@@ -185,8 +205,40 @@ else
     row "bin/roster-render --check" "$NO" "reported no agent files"; miss
   fi
 
-  # Lane pins: informational, and optional the way the lanes themselves are.
+  # Codex agent files: optional, the way Codex itself is. They are copies
+  # (Codex refuses a symlinked agent file), so a roster.conf or agents/*.md
+  # edit that never reached ~/.codex/agents shows up here as drift, whole file
+  # compared, and bin/install --codex is the fix. Without codex on PATH there
+  # is nothing to verify: one row says so instead. With codex but nothing
+  # installed for it, the one "not installed" row under Wiring already said so.
   required=0
+  if [ "$codex_unused" = 1 ]; then
+    :
+  elif have codex; then
+    codex_rows=0
+    while IFS= read -r line; do
+      [ -n "$line" ] || continue
+      r_st="${line%% *}"; r_rest="${line#* }"
+      case "$r_st" in
+        ok|drift|error) ;;
+        *) row "bin/roster-render --codex --check" "$NO" "$line"; miss; continue ;;
+      esac
+      codex_rows=$((codex_rows+1))
+      r_path="${r_rest%%:*}"; r_note="${r_rest#*: }"
+      case "$r_st" in
+        ok)    row "$r_path" "$OK" "$r_note"; ok=$((ok+1)) ;;
+        drift) row "$r_path" "$NO" "$r_note; run bin/install --codex"; miss ;;
+        *)     row "$r_path" "$NO" "$r_note"; miss ;;
+      esac
+    done < <("$repo/bin/roster-render" --codex "$HOME/.codex/agents" --check 2>&1)
+    if [ "$codex_rows" -eq 0 ]; then
+      row "bin/roster-render --codex --check" "$NO" "reported no Codex agent files"; miss
+    fi
+  else
+    row "Codex agent files" "$NO" "optional: codex not installed"; miss
+  fi
+
+  # Lane pins: informational, and optional the way the lanes themselves are.
   pin_row "GPT lane" GPT_REVIEWER_MODEL GPT_REVIEWER_EFFORT
   pin_row "Kimi lane" KIMI_REVIEWER_MODEL KIMI_REVIEWER_VARIANT
   pin_row "Claude lane" CLAUDE_REVIEWER_MODEL CLAUDE_REVIEWER_EFFORT
@@ -265,15 +317,18 @@ else
   need=""; have opencode || need="opencode"; have srt || need="${need:+$need and }srt"
   row "Kimi (via OpenCode)" "$NO" "needs $need"
 fi
-# The Claude lane bills Anthropic tokens: opt-in per SKILL.md, never part of the
-# no-cost roster the lane count announces.
+# The Claude lane bills Anthropic tokens: opt-in under the skill's lane policy
+# (SKILL.md, and the mechanics file for the harness in use), never part of the
+# no-cost roster the lane count announces. The in-session claude-reviewer agent
+# named in the fallback row is a Claude Code feature; a Codex main loop has no
+# such fallback and simply goes without this lane when srt is missing.
 if [ "$claude_pinned" = 0 ]; then
   row "Claude (sandboxed, opt-in)" "$NO" "$claude_pin"; claude_lane="retired"
 elif have claude && have srt; then
   row "Claude (sandboxed, opt-in)" "$OK" "claude + srt present; $claude_pin"; claude_lane="live"
 else
   need=""; have claude || need="claude"; have srt || need="${need:+$need and }srt"
-  row "Claude (sandboxed, opt-in)" "$NO" "needs $need; in-session claude-reviewer agent still works"; claude_lane="retired"
+  row "Claude (sandboxed, opt-in)" "$NO" "needs $need; in Claude Code the in-session claude-reviewer agent still works"; claude_lane="retired"
 fi
 
 echo
@@ -284,7 +339,7 @@ else
   echo "$lanes of 2 no-cost review lanes live, Claude opt-in lane $claude_lane; $ok checks ok, $req_missing REQUIRED unmet, $opt_missing optional unmet."
   echo "Fix the required checks (SETUP.md, Required: Claude Code); optional ones only retire lanes."
 fi
-echo "Models and efforts: roster.conf (agent frontmatter and lane pins verified above)."
-echo "Edit roster.conf, run bin/roster-render, rerun this. ROSTER.md explains the roles."
+echo "Models and efforts: roster.conf (agent frontmatter, Codex agent files and lane pins verified above)."
+echo "Edit roster.conf, run bin/roster-render (Claude agents) and bin/install (Codex agent files), rerun this. ROSTER.md explains the roles."
 echo
 [ "$req_missing" -eq 0 ]
