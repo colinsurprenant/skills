@@ -1,6 +1,6 @@
 ---
 name: claude-reviewer
-description: Fresh-eyes review agent for the delegate-build workflow Phase 4. Reviews one diff or branch against the codebase and reports ranked findings — read-only, never fixes. Use when the orchestrating session wants an Anthropic-grade breadth review without escalating to /code-review; not for building, fixing, exploration, or planning.
+description: Fresh-eyes review agent for the delegate-build workflow Phase 4. Reviews one change, named by its base and head or a commit range, against the codebase and reports ranked findings — read-only, never fixes. Use when the orchestrating session wants an Anthropic-grade breadth review without escalating to /code-review; not for building, fixing, exploration, or planning.
 model: opus
 effort: xhigh
 tools: Read, Grep, Glob, Bash
