@@ -130,10 +130,12 @@ delegate-build GPT lane resolves it through the skill symlink before dispatching
 invocation. `bin/doctor` reads it too, so doctor itself never names a model.
 Run it after every swap. Prose promises drift; doctor does not.
 
-The Codex agent files are the one exception to run-time reads: they are copies,
-so a `CODEX_*` edit reaches Codex only on the next `bin/install` run from the
-clone that `~/.agents/skills/delegate-build` links into, and doctor reports the
-drift until then.
+The rendered agent files are the exception to run-time reads. The `model:` and
+`effort:` lines in `agents/*.md` change only when `bin/roster-render` runs
+(plain `bin/install` runs it). The Codex agent files are copies, so a `CODEX_*`
+edit reaches Codex only on the next `bin/install` run from the clone that
+`~/.agents/skills/delegate-build` links into. Doctor reports the drift in
+either until then.
 
 ## Combo log: the evidence stream
 

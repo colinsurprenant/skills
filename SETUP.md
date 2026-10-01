@@ -201,9 +201,10 @@ number no longer predicts when.
 delegate-build Phase 4 runs whichever of these are installed and reports the
 ones it skipped. None is required; with none of them the phase falls back to
 the in-session `claude-reviewer` agent (Claude Code only) or is skipped. Lanes
-are named by model family (Claude, GPT, Kimi); the model inside a lane and the
-path that reaches it are pinned in `roster.conf` and can change without
-renaming the lane.
+are named by model family (Claude, GPT, Kimi); the model inside a lane is
+pinned in `roster.conf` and can change without renaming the lane. The path
+that reaches it is fixed in code (the Codex plugin, the sandboxed `claude`
+wrapper), except Kimi's provider, which is part of its `roster.conf` slug.
 
 | Lane | Needs | Notes |
 | --- | --- | --- |
@@ -211,13 +212,17 @@ renaming the lane.
 | Kimi (via OpenCode) | `opencode`, a Kimi provider, and `srt` | model and optional reasoning variant pinned from `roster.conf` at the repo root; change the slug there if your provider spells it differently, and add that provider's API host to `network.allowedDomains` in `delegate-build/sandbox/kimi-srt-settings.json`, or the sandbox blocks it |
 | Claude (sandboxed, opt-in) | `claude` on PATH and `srt` | model and effort pinned from `roster.conf` at the repo root |
 
-Every lane takes its model and effort from `roster.conf` at the repo root, the
-one place either is set. The wrappers read it at launch, so an edit there is
-live with no reinstall; only the Codex agent files are copies, reached by
-`bin/install`. [ROSTER.md](ROSTER.md) explains the roles and which key
-feeds which lane, and `bin/doctor` prints the pins each lane will use. Either
-sandboxed wrapper takes `--dry-run`, which prints the command it would run
-without running it, so a pin can be checked on a machine without srt.
+Each of the three review lanes takes its model and effort from `roster.conf`
+at the repo root, the one place either is set. (ROSTER.md's escalation row,
+the built-in `/code-review` at `max`, is not a lane and has no pin.) The lanes
+read it at launch, so an edit there is live with no reinstall. The agent files
+are the exception: the `model:` and `effort:` lines in `agents/*.md` change
+only when `bin/roster-render` runs, and the Codex agent files are copies, both
+refreshed by `bin/install`. [ROSTER.md](ROSTER.md) explains the roles and
+which key feeds which lane, and `bin/doctor` prints the pins each lane will
+use. Either sandboxed wrapper takes `--dry-run`, which prints the command it
+would run without running it, so a pin can be checked on a machine without
+srt.
 
 From a Codex main loop, the Kimi and Claude lanes run the same wrappers through
 `~/.agents/skills/delegate-build/sandbox/`, each escalated out of Codex's
@@ -267,8 +272,9 @@ entry is the backstop for command shapes the plain patterns miss. Grow
 actually hit (`~/.director` is my session-coordination log, drop it if you
 don't run Director).
 
-This is independent of the review-lane sandboxing above. The lanes wrap
-themselves in `srt` whatever this setting says.
+This is independent of the review-lane sandboxing above. The Kimi and Claude
+lanes wrap themselves in `srt` whatever this setting says, and the GPT lane
+runs in the Codex plugin's own sandbox.
 
 ## Harness snapshots
 

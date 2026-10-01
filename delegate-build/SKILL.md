@@ -157,7 +157,9 @@ ask first), or skip the phase.
 - **Kimi (via OpenCode)**: the wrapper pins the model (and optional `--variant`
   effort) from `roster.conf` and runs `opencode run` under srt: writes
   confined to OpenCode's state dirs and temp space, network to the Kimi API
-  and model catalogs, repo read-only. If srt is missing the wrapper refuses;
+  and model catalogs, repo read-only unless it sits under one of those
+  writable roots (OpenCode's state dirs, `/tmp`, `/private/tmp`,
+  `/private/var/folders`). If srt is missing the wrapper refuses;
   report it and let the user decide, never fall back to a bare
   `opencode run`. "Error starting FSEvents stream" is benign sandbox noise.
   Gotcha: `opencode run` can exit 0 with NO final message when
@@ -167,8 +169,10 @@ ask first), or skip the phase.
   at launch), so a finished review survives a killed run.
 - **Claude (OPT-IN — costs Anthropic tokens)**: the wrapper runs headless
   `claude -p` under srt, pinned to the model and effort in `roster.conf`,
-  read-only at two layers (tool allowlist + OS boundary), all MCP disabled, the
-  same two-layer Director kill as the Kimi lane. Its rubric is the body of
+  read-only at two layers (tool allowlist + OS boundary; for a repo inside a
+  path `claude-srt-settings.json` leaves writable, the temp space or
+  `~/.claude` outside its denied subdirs, only the allowlist holds), all MCP
+  disabled, the same two-layer Director kill as the Kimi lane. Its rubric is the body of
   `agents/claude-reviewer.md`, and it tees stdout like Kimi. If srt is missing,
   take the in-session fallback the mechanics file names and say so; with none,
   the lane is unavailable, and say so. It bills Anthropic tokens, so it is not
