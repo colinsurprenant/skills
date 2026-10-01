@@ -214,4 +214,5 @@ Then capture the run's tallies to the combo log, always: one
 accepted / rejected / unique-catch counts, plus builder facts (work orders,
 bounces, fix cycles) and any skips with their kind. The record shape lives in
 `ROSTER.md`. Future roster decisions run on this log; a run that skips it
-leaves no sample.
+leaves no sample. If `director` is not on PATH, put the same record at the end
+of the summary instead, under a `combo-log` heading.

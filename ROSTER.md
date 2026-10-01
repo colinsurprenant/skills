@@ -59,7 +59,7 @@ Reviewer portfolio (a set, not a slot; see Selection logic):
 | GPT | `$GPT_REVIEWER_MODEL` @ `$GPT_REVIEWER_EFFORT` | Codex CLI (`/codex:rescue`) | ChatGPT plan |
 | Kimi | `$KIMI_REVIEWER_MODEL` @ `$KIMI_REVIEWER_VARIANT` | opencode + srt sandbox | Moonshot |
 | Claude (opt-in) | `$CLAUDE_REVIEWER_MODEL` @ `$CLAUDE_REVIEWER_EFFORT` | sandboxed claude, or in-session `claude-reviewer` | Anthropic |
-| Escalation | /code-review ultra | Claude cloud | Anthropic |
+| Escalation | built-in `/code-review` @ `max` (`ultra`: cloud, user-launched) | Claude Code, in session | Anthropic |
 
 Lanes are named by lineage, never by the model inside or the access path,
 because the portfolio is diversity by lineage and both of those churn. The
@@ -147,7 +147,8 @@ singleton outcome (a bounced work order, a researcher spot-check result):
     director emit --type note --area combo-log "<task>: build=<model> orders=<n> bounced=<n> fix_cycles=<n>; lane <name>: submitted=<n> accepted=<n> rejected=<n> unique=<n>; lane <name>: ...; skips=<lane:kind|none>; note=<one line>"
 
 `director` is a separate session-coordination CLI that is not part of this
-repo; the combo log and the swap procedure's `director emit` step depend on it.
+repo. The swap procedure's `director emit` step depends on it; without it,
+delegate-build puts the combo-log record at the end of its summary instead.
 
 Record facts (counts and one-line reasons), never derived metrics; metrics
 are recomputed at analysis time from the raw notes, so the record shape can

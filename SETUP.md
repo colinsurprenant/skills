@@ -228,9 +228,10 @@ degrading to an unsandboxed run:
 
 Those wrappers also neutralize Director, a separate session-coordination CLI
 of mine that is not part of this repo. If you don't have it, that wiring costs
-nothing and can stay as it is. The workflow itself does depend on Director: its
-Phase 5 combo-log note runs `director emit`, as does the swap procedure in
-[ROSTER.md](ROSTER.md).
+nothing and can stay as it is. The workflow's Phase 5 combo-log note runs
+`director emit` when Director is on PATH and otherwise goes at the end of the
+run's summary; the swap procedure in [ROSTER.md](ROSTER.md) also runs
+`director emit`.
 
 ## Optional: Claude Code Bash sandbox
 

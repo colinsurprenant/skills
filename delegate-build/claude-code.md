@@ -102,9 +102,11 @@ is the `claude-reviewer` agent.
   agent in-session instead (same rubric and pins, classifier-gated rather than
   OS-sandboxed) and say so. Offer it when the user wants that pass without
   `/code-review`.
-- **`/code-review:code-review`** is the EXPENSIVE escalation, billed
-  Anthropic-side. Reserve it for high-stakes diffs the user explicitly wants
-  deep-reviewed.
+- **`/code-review`**, built into Claude Code, is the EXPENSIVE escalation,
+  drawn from the Anthropic plan. Reserve it for high-stakes diffs the user
+  explicitly wants deep-reviewed: run it at effort `max` on the branch or PR
+  (`--comment` posts the findings on the PR). Its `ultra` level, a multi-agent
+  cloud review, only the user can launch: offer it, never attempt it.
 
 ## Session effort
 
