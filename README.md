@@ -128,8 +128,9 @@ and supervision rather than model goodwill:
   repo readable but not writable, writes confined to OpenCode's own state
   dirs and temp space, network confined to the Kimi API and OpenCode's model
   catalogs. Fails closed when srt is missing rather than degrading to an
-  unsandboxed run. The repo stays read-only only outside that temp space: a
-  repo under `/tmp`, `/private/tmp` or `/private/var/folders` is writable.
+  unsandboxed run. The repo stays read-only only outside those writable
+  roots: a repo under OpenCode's state dirs or the temp space (`/tmp`,
+  `/private/tmp`, `/private/var/folders`) is writable.
 - The **GPT reviewer**, reached through Codex from a Claude Code main loop,
   is OS-sandboxed read-only by its plugin's own default, pinned in the
   delegate-build skill's [claude-code.md](delegate-build/claude-code.md) so a
