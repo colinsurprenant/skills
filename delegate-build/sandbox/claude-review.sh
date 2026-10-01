@@ -4,7 +4,8 @@
 # fallback for machines without srt (a Codex main loop has no such fallback and
 # goes without the lane). Wraps headless `claude -p` (model and effort pinned
 # from roster.conf) in srt, mirroring kimi-review.sh: repo readable but not
-# writable, writes confined to Claude's own state dir + temp space, network to
+# writable unless it sits under a writable root, writes confined to Claude's
+# own state dir + temp space, network to
 # the Anthropic API only. Two boundaries: the tool allowlist keeps the reviewer
 # read-only at the harness layer, srt repeats it at the OS layer. Reviewers
 # never need write access, so the boundary costs nothing — this is least

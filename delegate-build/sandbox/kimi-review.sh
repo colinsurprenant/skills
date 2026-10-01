@@ -4,7 +4,8 @@
 # (@anthropic-ai/sandbox-runtime):
 # writes are confined to OpenCode's own state dirs + temp space, network to the
 # Kimi API and the model catalogs (models.dev, models.opencode.ai). The repo
-# stays readable but not writable —
+# stays readable but not writable, unless it sits under one of those writable
+# roots (a checkout in temp space is writable) —
 # OpenCode has no OS-level sandbox of its own, and this lane runs an open-weight
 # model headless, so the boundary must be mechanical, not model judgment.
 # The lane is named for the model family; the pinned model and the provider

@@ -70,8 +70,9 @@ A long build outgrows one context window, so the build loop is split:
 judgment (planning, review) stays hot on the main loop, implementation
 volume goes to fresh builders at the roster's pinned model and effort, and
 breadth review runs on external harnesses, under OS-level confinement (see
-Sandboxing). The in-session `claude-reviewer` fallback, used when srt or
-every lane is missing, runs under Claude Code's own permission checks instead.
+Sandboxing). The in-session `claude-reviewer` agent, used when no external
+lane is available or in place of an opted-in Claude lane that srt cannot
+wrap, runs under Claude Code's own permission checks instead.
 
 - **[delegate-build/](delegate-build/SKILL.md)**: the split build workflow,
   invoked explicitly for builds that span more than one session. Plan and
@@ -157,9 +158,10 @@ and supervision rather than model goodwill:
 
 Each review lane's model and effort is pinned from `roster.conf` at the repo
 root, the one place either is set (ROSTER.md's escalation row, `/code-review`
-at `max`, is not a lane and has no pin), and the wrappers read it at launch
-rather than carrying a slug of their own. [ROSTER.md](ROSTER.md) explains the
-roles and which key feeds which lane.
+at `max`, is not a lane and has no pin). No lane carries a slug of its own:
+the Kimi and Claude wrappers read `roster.conf` at launch, and for the GPT lane
+the main loop reads it through `bin/roster-get` before each dispatch.
+[ROSTER.md](ROSTER.md) explains the roles and which key feeds which lane.
 
 The premise: a git worktree is merge hygiene, not a security boundary. Any
 agent that runs `npm install` or a test suite executes third-party code with
