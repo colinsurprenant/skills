@@ -162,8 +162,8 @@ against Codex CLI 0.159.2.
 Start the main loop with `codex --sandbox workspace-write --ask-for-approval
 on-request` and invoke the skill as `$delegate-build`. The main loop must be
 GPT-6 Astra, and it cannot see its own model slug, so unless you named the
-model in the session it asks you to confirm it before announcing; on the
-builders' model or a weaker one it skips itself. Under approval policy `never`
+model in the session it asks you to confirm it before announcing; on any other
+model it skips itself. Under approval policy `never`
 (or a granular policy with sandbox approvals off) it stops before Phase 1,
 since commits and the lane wrappers need escalation. Workers inherit the main
 loop's sandbox, so the scout and researcher are read-only by their instructions

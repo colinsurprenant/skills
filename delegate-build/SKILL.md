@@ -146,7 +146,8 @@ file gives the path that resolves it. An absent tool is a legitimate lane skip
 only as a VERIFIED fact: before calling a lane absent, run the check in THIS
 session (doctor, or the lane's own `command -v` / plugin lookup) and name it.
 In the announcement, name every skipped lane and its kind: "not installed",
-"installed but the harness is down" and "own-lineage" are different facts.
+"installed but the harness is down", "own-lineage" and "denied" (its run was
+refused by the approval step) are different facts.
 Dropping an INSTALLED no-cost lane is a judgment call the user can veto, never
 silent scaling. If no external lane is available, say so and offer the
 in-session fallback the mechanics file names, if it names one (Anthropic-billed,

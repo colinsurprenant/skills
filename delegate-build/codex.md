@@ -7,11 +7,10 @@ announcing, and apply the model gate and the permissions check first.
 
 ## Model gate
 
-The main loop must not be weaker than the builders, because Phases 3 and 5
-put review and triage on it (SKILL.md says why). The builders run on
-`CODEX_BUILDER_MODEL`, read through `bin/roster-get` (see Doctor and roster
-paths). The qualifying main loop is GPT-6 Astra: running on the builders'
-model or a weaker one fails the gate, and you say so and skip the workflow.
+The main loop must be GPT-6 Astra. Any other model fails the gate: say so and
+skip the workflow. (SKILL.md says why the gate exists: Phases 3 and 5 put
+review and triage on this loop. The builders run on `CODEX_BUILDER_MODEL`,
+read through `bin/roster-get`; see Doctor and roster paths.)
 
 You cannot see your own model slug. Astra and the builders' model share a base
 prompt, and `-m`, `--profile`, `-c` and `/model` all override `config.toml`, so
@@ -121,8 +120,15 @@ config yourself.
 
 If the permissions text says `approvals_reviewer` is `auto_review`, Codex's
 auto-reviewer decides each escalation rather than the user. Tell the user so
-once, at activation. Commits and the Kimi lane then proceed without a chat OK;
-the chat gates above still stop.
+once, at activation. Commits and the Kimi lane then proceed without the
+user's approval prompt; the chat gates above still stop.
+
+A denied escalation is a veto, never something to retry or route around (an
+unescalated wrapper only fails with exit 71). A denied lane wrapper skips that
+lane: name it with kind "denied" in the roster announcement and log it as
+`<lane>:denied` in the combo log.
+A denied git write stops the workflow at that point: report it to the user. A
+denied combo-log emit: put the record line in the summary for the user to log.
 
 These need escalation:
 

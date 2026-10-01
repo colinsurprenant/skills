@@ -27,7 +27,9 @@
 # but under an explicitly requested harness flag (--codex, --opencode,
 # --copilot, --all) it exits non-zero as well. Finishes by running
 # bin/doctor, which is the referee for whether the install actually took —
-# if this script and doctor ever disagree about a link, doctor wins.
+# for the always-on Claude Code set, if this script and doctor disagree about
+# a link, doctor wins; the link-failure and flag-refusal exits above stand on
+# their own, since doctor rates the harness-flag links as optional.
 #
 # Usage: bin/install [--codex] [--opencode] [--copilot] [--all]
 set -uo pipefail

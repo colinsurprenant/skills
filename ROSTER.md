@@ -161,8 +161,9 @@ not fix cycles; they count in `bounced`. A deferred follow-up, and any lane
 round the user asks for past the bound, go in `note=`. This definition of
 `fix_cycles` changed 2026-09-28, so earlier records are not comparable on it.
 `skips=` names each skipped lane with its kind: not installed, installed but
-down, or `<lane>:own-lineage` for the orchestrator's own lineage where no
-opt-in path is offered (from a Codex main loop, `gpt:own-lineage`).
+down, `<lane>:own-lineage` for the orchestrator's own lineage where no
+opt-in path is offered (from a Codex main loop, `gpt:own-lineage`), or
+`<lane>:denied` when its run was refused by the approval step.
 Lane names changed 2026-09-30 (codex to gpt, k3 to kimi, opus to claude), and
 the workflow's name with them (opus-build to delegate-build); analysis over
 earlier records maps the old names onto the new.
