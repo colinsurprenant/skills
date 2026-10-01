@@ -183,7 +183,8 @@ for m in json.load(sys.stdin)["models"]:
   if [ ! -s "$tsv" ]; then
     row "Codex catalog" "$NO" "codex debug models listed no models"; miss; return
   fi
-  if codex debug models --bundled 2>/dev/null | cmp -s - "$json"; then
+  if run_limited "$secs" "$deep_tmp/codex-bundled.json" /dev/null codex debug models --bundled \
+     && cmp -s -- "$deep_tmp/codex-bundled.json" "$json"; then
     src="bundled, no account list"
   else
     src="account list"
