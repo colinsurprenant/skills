@@ -151,14 +151,16 @@ probe_error_line() {
 # CODEX_*_{MODEL,EFFORT} pin against Codex's own catalog (`codex debug models`),
 # so a typo'd slug or an effort the model does not offer fails here and not when
 # Codex spawns the agent. This repo keeps no effort list: the catalog says what
-# each model accepts. With a login and network the catalog is the account's live
-# list; otherwise Codex falls back to the copy bundled in the binary, silently
-# and with exit 0, so a catalog byte-identical to `--bundled` is labeled that way.
+# each model accepts. With a login the catalog is the account's list, which
+# Codex caches in models_cache.json and serves while fresh, so the row names that
+# cache's fetch time rather than claiming a live fetch. Without a login or a
+# cache Codex falls back to the copy bundled in the binary, silently and with
+# exit 0, so a catalog byte-identical to `--bundled` is labeled that way.
 # The role names mirror bin/roster-render --codex, the other place that names
 # the CODEX_* keys; bin/roster-get has no list-keys mode.
 codex_catalog_checks() {
   local json="$deep_tmp/codex-models.json" err="$deep_tmp/codex-models.err"
-  local tsv="$deep_tmp/codex-models.tsv" secs=30 tab src rc label mk ek model effort line efforts offered
+  local tsv="$deep_tmp/codex-models.tsv" secs=30 tab src rc label mk ek model effort line efforts offered cache fetched
   tab="$(printf '\t')"
   run_limited "$secs" "$json" "$err" codex debug models; rc=$?
   if [ "$rc" = 124 ]; then
@@ -181,8 +183,17 @@ for m in json.load(sys.stdin)["models"]:
   if [ ! -s "$tsv" ]; then
     row "Codex catalog" "$NO" "codex debug models listed no models"; miss; return
   fi
-  src="live"
-  codex debug models --bundled 2>/dev/null | cmp -s - "$json" && src="bundled, no live list"
+  if codex debug models --bundled 2>/dev/null | cmp -s - "$json"; then
+    src="bundled, no account list"
+  else
+    src="account list"
+    cache="${CODEX_HOME:-$HOME/.codex}/models_cache.json"
+    if have jq; then fetched="$(jq -r '.fetched_at // empty' "$cache" 2>/dev/null)"
+    else fetched="$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1])).get("fetched_at") or "")' "$cache" 2>/dev/null)"
+    fi
+    fetched="$(printf '%s' "$fetched" | sed 's/\.[0-9]*//')"
+    [ -z "$fetched" ] || src="account list fetched $fetched"
+  fi
 
   set -- "Codex catalog: GPT lane"   GPT_REVIEWER_MODEL      GPT_REVIEWER_EFFORT \
          "Codex catalog: builder"    CODEX_BUILDER_MODEL     CODEX_BUILDER_EFFORT \
