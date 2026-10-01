@@ -169,8 +169,10 @@ ask first), or skip the phase.
   at launch), so a finished review survives a killed run.
 - **Claude (OPT-IN — costs Anthropic tokens)**: the wrapper runs headless
   `claude -p` under srt, pinned to the model and effort in `roster.conf`,
-  read-only at two layers (tool allowlist + OS boundary), all MCP disabled, the
-  same two-layer Director kill as the Kimi lane. Its rubric is the body of
+  read-only at two layers (tool allowlist + OS boundary; the OS layer leaves a
+  repo under `~/.claude` or the temp space writable, so there only the
+  allowlist holds), all MCP disabled, the same two-layer Director kill as the
+  Kimi lane. Its rubric is the body of
   `agents/claude-reviewer.md`, and it tees stdout like Kimi. If srt is missing,
   take the in-session fallback the mechanics file names and say so; with none,
   the lane is unavailable, and say so. It bills Anthropic tokens, so it is not
