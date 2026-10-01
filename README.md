@@ -158,10 +158,12 @@ and supervision rather than model goodwill:
 
 Each review lane's model and effort is pinned from `roster.conf` at the repo
 root, the one place either is set (ROSTER.md's escalation row, `/code-review`
-at `max`, is not a lane and has no pin). No lane carries a slug of its own:
-the Kimi and Claude wrappers read `roster.conf` at launch, and for the GPT lane
-the main loop reads it through `bin/roster-get` before each dispatch.
-[ROSTER.md](ROSTER.md) explains the roles and which key feeds which lane.
+at `max`, is not a lane and has no pin). The Kimi and Claude wrappers read
+`roster.conf` at launch, and for the GPT lane the main loop reads it through
+`bin/roster-get` before each dispatch. The in-session `claude-reviewer`
+fallback is the exception: it carries rendered pins in its frontmatter, which
+change only when `bin/roster-render` runs. [ROSTER.md](ROSTER.md) explains the
+roles and which key feeds which lane.
 
 The premise: a git worktree is merge hygiene, not a security boundary. Any
 agent that runs `npm install` or a test suite executes third-party code with
