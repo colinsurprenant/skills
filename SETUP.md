@@ -18,6 +18,7 @@ path):
 
     git clone https://github.com/colinsurprenant/skills
     REPO="$PWD/skills"    # or wherever you cloned it
+    cd "$REPO"
 
 ## Install
 
@@ -25,17 +26,21 @@ path):
     bin/install --all      # plus the Codex (links and agent files), OpenCode, and Copilot CLI setup
     bin/install --copilot  # or any subset: --codex, --opencode, --copilot
 
+It first runs `bin/roster-render`, which rewrites the `model:` and `effort:`
+lines of `agents/*.md` in the clone from `roster.conf`, so the agent links land
+on current files.
+
 Idempotent and non-clobbering: a link already resolving to its documented
 target is left alone, and anything else found at a target path, a stray
 file or a link to the wrong place, is reported and kept, never replaced. The manual sections below are the same links spelled out,
 kept for transparency and for partial installs.
 
 Exit status: a link that cannot be created (for example a parent directory that
-cannot be made) is a failure row and exits non-zero. A refused link, one whose
-path is occupied by something else, keeps today's semantics for the always-on
-Claude Code set (the doctor report's required rows judge it), but under an
-explicitly requested flag (`--codex`, `--opencode`, `--copilot`, `--all`) it
-exits non-zero as well.
+cannot be made) is a failure row and exits non-zero, and so does a failed agent
+render. A refused link, one whose path is occupied by something else, is judged
+by the doctor report's required rows for the always-on Claude Code set, but
+under an explicitly requested flag (`--codex`, `--opencode`, `--copilot`,
+`--all`) it exits non-zero as well. Otherwise the exit status is doctor's.
 
 `--codex` does more than link: besides the `AGENTS.md` link it links
 `delegate-build` into `~/.agents/skills` and renders three Codex agent files
@@ -106,9 +111,9 @@ required checks, so a Claude-only install exits 0.
     ln -s "$REPO/commands/iterate.md"         ~/.claude/commands/iterate.md
 
 If you already have a `~/.claude/CLAUDE.md`, the first link fails rather than
-clobbering it: fold your content into your fork of `CLAUDE.global.md` (it has
-a placeholder section for durable preferences), then move the old file away
-and link.
+clobbering it: fold your content into your fork of `CLAUDE.global.md`
+(replacing the standing rules it carries with your own), then move the old file
+away and link.
 
 `CLAUDE.global.md` `@`-imports `AGENT_BEHAVIOR.md`, which delivers the
 behavior file to every session and non-fork subagent, from any entry point.
@@ -164,9 +169,10 @@ Start the main loop with `codex --sandbox workspace-write --ask-for-approval
 on-request` and invoke the skill as `$delegate-build`. The main loop must be
 GPT-6 Astra, and it cannot see its own model slug, so unless you named the
 model in the session it asks you to confirm it before announcing; on any other
-model it skips itself. Under approval policy `never`
+model it skips itself. With a sandbox active, under approval policy `never`
 (or a granular policy with sandbox approvals off) it stops before Phase 1,
-since commits and the lane wrappers need escalation. Workers inherit the main
+since commits and the lane wrappers need escalation; under full access with no
+sandbox it proceeds, since nothing needs escalation. Workers inherit the main
 loop's sandbox, so the scout and researcher are read-only by their instructions
 only. [delegate-build/codex.md](delegate-build/codex.md) covers the rest:
 approvals, escalating the Kimi and Claude wrappers out of Codex's sandbox, and
@@ -198,15 +204,17 @@ renaming the lane.
 
 | Lane | Needs | Notes |
 | --- | --- | --- |
-| GPT (via Codex) | the `openai/codex-plugin-cc` Claude Code plugin | read-only by the plugin's own default. The lane dispatches the plugin's own `/codex:rescue` command, not one defined here: the plugin's dedicated `/codex:review` commands are user-invocable only, so delegate-build frames the fix-capable rescue agent as review-only by prompt |
-| Kimi (via OpenCode) | `opencode`, a Kimi provider, and `srt` | model and optional reasoning variant pinned from `roster.conf` at the repo root; change the slug there if your provider spells it differently |
+| GPT (via Codex) | the `openai/codex-plugin-cc` Claude Code plugin, plus the `codex` CLI on PATH, logged in | read-only by the plugin's own default. The lane dispatches the plugin's own `/codex:rescue` command, not one defined here: the plugin's dedicated `/codex:review` commands are user-invocable only, so delegate-build frames the fix-capable rescue agent as review-only by prompt |
+| Kimi (via OpenCode) | `opencode`, a Kimi provider, and `srt` | model and optional reasoning variant pinned from `roster.conf` at the repo root; change the slug there if your provider spells it differently, and add that provider's API host to `network.allowedDomains` in `delegate-build/sandbox/kimi-srt-settings.json`, or the sandbox blocks it |
 | Claude (sandboxed, opt-in) | `claude` on PATH and `srt` | model and effort pinned from `roster.conf` at the repo root |
 
 Every lane takes its model and effort from `roster.conf` at the repo root, the
 one place either is set. The wrappers read it at launch, so an edit there is
 live with no reinstall; only the Codex agent files are copies, reached by
 `bin/install`. [ROSTER.md](ROSTER.md) explains the roles and which key
-feeds which lane, and `bin/doctor` prints the pins each lane will use.
+feeds which lane, and `bin/doctor` prints the pins each lane will use. Either
+sandboxed wrapper takes `--dry-run`, which prints the command it would run
+without running it, so a pin can be checked on a machine without srt.
 
 From a Codex main loop, the Kimi and Claude lanes run the same wrappers through
 `~/.agents/skills/delegate-build/sandbox/`, each escalated out of Codex's
@@ -220,7 +228,10 @@ degrading to an unsandboxed run:
 
 Those wrappers also neutralize Director, a separate session-coordination CLI
 of mine that is not part of this repo. If you don't have it, that wiring costs
-nothing and can stay as it is.
+nothing and can stay as it is. The workflow's Phase 5 combo-log note runs
+`director emit` when Director is on PATH and otherwise goes at the end of the
+run's summary; the swap procedure in [ROSTER.md](ROSTER.md) also runs
+`director emit`.
 
 ## Optional: Claude Code Bash sandbox
 

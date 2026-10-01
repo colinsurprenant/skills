@@ -11,16 +11,22 @@ hardcoded paths. The persona is mine: fork and edit.
     cd skills
     bin/install
 
+That wires Claude Code. Add `--codex`, `--opencode` or `--copilot` for those
+harnesses, or `--all` for all three; [SETUP.md](SETUP.md) has the detail.
+
 To update later: `git pull`, then `bin/install` again. Pulled edits to
 skills and agents land live through the symlinks, except the Codex agent files:
 those are generated copies (Codex refuses symlinked agent files) that reach
 Codex on the next `bin/install`, which refreshes the ones it generated earlier
-when `~/.agents/skills/delegate-build` links into this clone (otherwise one
-"not refreshed" row and nothing touched). The rerun also creates links a pull
-introduced (and drops the pre-rename `opus-build`, `opus-builder` and
-`opus-reviewer` links if you have them), is otherwise a no-op, and ends with
-the doctor report either way. It exits non-zero if a link cannot be created or,
-under a harness flag such as `--codex`, is refused.
+when `~/.agents/skills/delegate-build` links into this clone (otherwise it
+touches nothing, and prints one "not refreshed" row if generated files exist).
+The rerun also creates links a pull introduced (and drops the pre-rename
+`opus-build`, `opus-builder` and `opus-reviewer` links if you have them), is
+otherwise a no-op, and ends with the doctor report either way. It exits
+non-zero if a link cannot be created, if the agent render fails, or if a link
+is refused under a harness flag such as `--codex`; otherwise it exits with the
+doctor report's status, so an unmet required check (an existing
+`~/.claude/CLAUDE.md`, say) fails it too.
 
 ## What's here
 
@@ -33,7 +39,8 @@ The same behavior file reaches Claude Code, Codex CLI, OpenCode, and
 Copilot CLI, and a directive only stays if the harness running it doesn't
 already enforce it.
 Keeping that true takes machinery: harness system prompts change under you,
-so they're snapshotted, diffed, and the file is audited against them.
+so Claude Code's, Codex's and OpenCode's are snapshotted, diffed, and the file
+is audited against them (Copilot CLI's is not).
 
 - **[AGENT_BEHAVIOR.md](AGENT_BEHAVIOR.md)**: the behavior file. A routing
   header keys its sections to the harness and model actually running: a
@@ -41,7 +48,9 @@ so they're snapshotted, diffed, and the file is audited against them.
   for harnesses whose own prompts cover less.
 - **[CLAUDE.global.md](CLAUDE.global.md)**: the `~/.claude/CLAUDE.md`
   target. It carries the `@`-import that delivers the behavior file to
-  Claude Code, plus a placeholder for durable preferences. Codex and
+  Claude Code, plus my own standing preferences (Bash command chaining,
+  network git commands, multi-line bodies passed through files); a fork
+  replaces them with its own. Codex and
   OpenCode consume the file via `AGENTS.md` symlinks, Copilot CLI via its
   user-level `copilot-instructions.md`.
 - **[audit-directives/](audit-directives/SKILL.md)**: the audit skill. It
@@ -67,32 +76,37 @@ Sandboxing).
   invoked explicitly for builds that span more than one session. Plan and
   review on the main loop, build on fresh subagents at the model and effort
   pinned in roster.conf, breadth-review on whichever external lanes are
-  installed (a GPT lane through Codex, a Kimi lane through OpenCode, a
-  sandboxed Claude lane). Lanes are named by model family, since the model
-  inside a lane and its access path both change. The split buys context
+  installed (a GPT lane through Codex, a Kimi lane through OpenCode, an
+  opt-in sandboxed Claude lane). Lanes are named by model family, since the
+  model inside a lane and its access path both change. The split buys context
   continuity, not a token saving: measured on a one-session task, it cost
   more than a solo run for equal quality. SKILL.md is the harness-neutral
   core (roles, phases, order shape, lane policy);
   [claude-code.md](delegate-build/claude-code.md) and
   [codex.md](delegate-build/codex.md) hold each harness's mechanics:
   dispatch, lane invocation, model gate, approvals. The main loop is Claude
-  Code (`/delegate-build`) or Codex (`$delegate-build`), with Codex agents
-  pinned from the `CODEX_*` keys; from Codex the GPT lane is the main loop's
-  own lineage and is not offered.
+  Code (`/delegate-build`, which requires Fable or Opus) or Codex
+  (`$delegate-build`), with Codex agents pinned from the `CODEX_*` keys; from
+  Codex the GPT lane is the main loop's own lineage and is not offered.
   [review-2026-07-27.md](delegate-build/review-2026-07-27.md) is the
   adversarial review from its first validation run (written when the skill
   was still named opus-build);
   [sandbox/](delegate-build/sandbox/) confines the headless review lanes.
 - **[agents/delegate-builder.md](agents/delegate-builder.md)**,
-  **[agents/claude-reviewer.md](agents/claude-reviewer.md)** and
-  **[agents/scout.md](agents/scout.md)**: the pinned-model build, review and
-  scouting agents it dispatches to. `bin/roster-render --codex <dir>` also
-  generates Codex copies of the builder, scout and researcher (not committed;
-  `bin/install --codex` installs them; see [SETUP.md](SETUP.md)).
+  **[agents/claude-reviewer.md](agents/claude-reviewer.md)**,
+  **[agents/researcher.md](agents/researcher.md)** and
+  **[agents/scout.md](agents/scout.md)**: the pinned-model build, review,
+  research and scouting agents it dispatches to.
+  `bin/roster-render --codex <dir>` also generates Codex copies of the
+  builder, scout and researcher (not committed; `bin/install --codex`
+  installs them; see [SETUP.md](SETUP.md)).
 - **[commands/iterate.md](commands/iterate.md)**: the discovery-driven loop
   for fuzzy-scope work (frame, build, evaluate, decide). Its premise: in
   discovery work the spec is an output, written at convergence rather than
   guessed up front.
+- **[bin/measure-session](bin/measure-session)**: reads a Claude Code session
+  transcript and reports its list-price cost by model, main loop versus
+  subagents (`cost`), or where the main loop's tokens went by phase (`phases`).
 
 ### Trim
 
@@ -111,8 +125,9 @@ and supervision rather than model goodwill:
   Anthropic's [`@anthropic-ai/sandbox-runtime`](https://www.npmjs.com/package/@anthropic-ai/sandbox-runtime)
   by [delegate-build/sandbox/kimi-review.sh](delegate-build/sandbox/kimi-review.sh):
   repo readable but not writable, writes confined to OpenCode's own state
-  dirs and temp space, network confined to the Kimi API. Fails closed when
-  srt is missing rather than degrading to an unsandboxed run.
+  dirs and temp space, network confined to the Kimi API and OpenCode's model
+  catalogs. Fails closed when srt is missing rather than degrading to an
+  unsandboxed run.
 - The **GPT reviewer**, reached through Codex from a Claude Code main loop,
   is OS-sandboxed read-only by its plugin's own default, pinned in the
   delegate-build skill's [claude-code.md](delegate-build/claude-code.md) so a
