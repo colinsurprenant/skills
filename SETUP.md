@@ -93,10 +93,13 @@ each generated agent file, checked whole against `roster.conf` and the
 one row saying delegate-build is not installed for Codex; without `codex` on
 PATH, the link row stays and the agent-file rows give way to one row saying
 Codex is not installed.
-`bin/doctor --deep` additionally verifies the OpenCode model slug, which needs
-network. Unmet optional checks are informational: they tell you which lane is
-retired, not that something is broken. The exit status scores only the
-required checks, so a Claude-only install exits 0.
+`bin/doctor --deep` also sends one real prompt through the Kimi lane (so a
+model that is listed but crashes on use shows up) and checks the GPT and Codex
+pins against `codex debug models`. It needs network, spends a little plan usage
+on the Kimi prompt, and usually takes about ten seconds. Unmet optional checks
+are informational: they tell you which lane is retired, not that something is
+broken. The exit status scores only the required checks, so a Claude-only
+install exits 0.
 
 ## Required: Claude Code
 

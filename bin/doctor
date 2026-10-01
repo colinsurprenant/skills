@@ -10,13 +10,31 @@
 # roles, not a data source.
 #
 # Usage: bin/doctor [--deep]
-#   --deep also probes provider model lists (needs network, can be slow).
+#   --deep also runs live probes: one real prompt through the Kimi lane
+#   (delegate-build/sandbox/kimi-review.sh, 120 s limit) and the GPT_REVIEWER_*
+#   and CODEX_* pins checked against `codex debug models`. Needs network, spends
+#   a little plan usage on the Kimi prompt, and can take up to a couple of minutes.
 set -uo pipefail
 
 deep=0
 [ "${1:-}" = "--deep" ] && deep=1
 
 repo="$(CDPATH='' cd -P -- "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
+
+# --deep scratch space: probe output, and the Kimi wrapper's tee'd report (it
+# lands in $TMPDIR, which the probe points here so nothing outlives the run).
+# The trap also stops a probe still running when doctor is interrupted.
+deep_tmp=""; probe_pid=""
+deep_cleanup() {
+  [ -z "$probe_pid" ] || kill -TERM -- "-$probe_pid" 2>/dev/null
+  [ -z "$deep_tmp" ] || rm -rf -- "$deep_tmp"
+}
+if [ "$deep" = 1 ]; then
+  deep_tmp="$(mktemp -d "${TMPDIR:-/tmp}/doctor-deep-XXXXXX")" || exit 1
+  trap deep_cleanup EXIT
+  trap 'exit 130' INT
+  trap 'exit 143' TERM
+fi
 
 ok=0; req_missing=0; opt_missing=0
 required=0
@@ -76,6 +94,134 @@ pin_row() { # pin_row <label> <key>… — what roster.conf pins this lane to
   else
     row "$label" "$OK" "$vals ($from)"; ok=$((ok+1))
   fi
+}
+
+# run_limited <seconds> <stdout-file> <stderr-file> <cmd>…: --deep only. Returns
+# the command's status, or 124 on timeout. timeout(1) is not in macOS's base
+# system (coreutils brings timeout or gtimeout); without either, poll and kill.
+# The command runs in its own process group (set -m) so a timeout, or the
+# trap's TERM on interrupt, takes the whole tree down (srt, opencode), not just
+# the wrapper.
+run_limited() {
+  local secs="$1" out="$2" err="$3" t="" ticks=0 rc
+  shift 3
+  t="$(command -v timeout || command -v gtimeout)" || t=""
+  set -m
+  if [ -n "$t" ]; then "$t" -k 5 "$secs" "$@" >"$out" 2>"$err" </dev/null &
+  else "$@" >"$out" 2>"$err" </dev/null &
+  fi
+  probe_pid=$!
+  set +m
+  if [ -z "$t" ]; then
+    while kill -0 "$probe_pid" 2>/dev/null; do
+      if [ "$ticks" -ge $((secs * 5)) ]; then
+        kill -TERM -- "-$probe_pid" 2>/dev/null; sleep 1; kill -KILL -- "-$probe_pid" 2>/dev/null
+        { wait "$probe_pid"; } 2>/dev/null; probe_pid=""
+        return 124
+      fi
+      sleep 0.2; ticks=$((ticks+1))
+    done
+  fi
+  { wait "$probe_pid"; } 2>/dev/null; rc=$?
+  probe_pid=""
+  return "$rc"
+}
+
+# probe_error_line <file>…: the first line worth showing from a failed probe:
+# ANSI stripped, blanks dropped, the wrapper's own banner and opencode's benign
+# "Error starting FSEvents stream" (SKILL.md) skipped, then the first line that
+# reads like an error, else the last line left, else "no output". An error that
+# opens a JSON object ("Error: {") takes its next few lines too, joined.
+probe_error_line() {
+  local esc line
+  esc="$(printf '\033')"
+  line="$(cat -- "$@" 2>/dev/null | sed "s/${esc}\[[0-9;?]*[A-Za-z]//g" | tr -d '\r' \
+    | grep -Ev '^[[:space:]]*$|^kimi-review: tee|^> |FSEvents' \
+    | awk '
+        !found && tolower($0) ~ /error|fail|fatal|panic|exception|denied|refused|abort|crash|unauthori|not found|invalid/ {
+          found = 1; msg = $0; if ($0 ~ /[{[][[:space:]]*$/) more = 5; next }
+        found && more > 0 { s = $0; sub(/^[[:space:]]+/, "", s); msg = msg " " s; more--; next }
+        { last = $0 }
+        END { print found ? msg : last }')"
+  [ -n "$line" ] || line="no output"
+  printf '%.160s' "$line"
+}
+
+# codex_catalog_checks: --deep only. Checks GPT_REVIEWER_* and every
+# CODEX_*_{MODEL,EFFORT} pin against Codex's own catalog (`codex debug models`),
+# so a typo'd slug or an effort the model does not offer fails here and not when
+# Codex spawns the agent. This repo keeps no effort list: the catalog says what
+# each model accepts. With a login the catalog is the account's list, which
+# Codex caches in models_cache.json and serves while fresh, so the row names that
+# cache's fetch time rather than claiming a live fetch. Without a login or a
+# cache Codex falls back to the copy bundled in the binary, silently and with
+# exit 0, so a catalog byte-identical to `--bundled` is labeled that way.
+# The role names mirror bin/roster-render --codex, the other place that names
+# the CODEX_* keys; bin/roster-get has no list-keys mode.
+codex_catalog_checks() {
+  local json="$deep_tmp/codex-models.json" err="$deep_tmp/codex-models.err"
+  local tsv="$deep_tmp/codex-models.tsv" secs=30 tab src rc label mk ek model effort line efforts offered cache fetched
+  tab="$(printf '\t')"
+  run_limited "$secs" "$json" "$err" codex debug models; rc=$?
+  if [ "$rc" = 124 ]; then
+    row "Codex catalog" "$NO" "codex debug models timed out after $secs s"; miss; return
+  elif [ "$rc" -ne 0 ]; then
+    row "Codex catalog" "$NO" "codex debug models exited $rc: $(probe_error_line "$err")"; miss; return
+  fi
+  # One line per model: slug, supported efforts (comma-joined), visibility.
+  if have jq; then
+    jq -r '.models[] | [.slug, ([.supported_reasoning_levels[]?.effort] | join(",")), (.visibility // "")] | @tsv' \
+      "$json" >"$tsv" 2>/dev/null
+  elif have python3; then
+    python3 -c 'import json, sys
+for m in json.load(sys.stdin)["models"]:
+    print("\t".join([m["slug"], ",".join(l["effort"] for l in m.get("supported_reasoning_levels") or []), m.get("visibility") or ""]))' \
+      <"$json" >"$tsv" 2>/dev/null
+  else
+    row "Codex catalog" "$NO" "needs jq or python3 to read codex debug models"; miss; return
+  fi
+  if [ ! -s "$tsv" ]; then
+    row "Codex catalog" "$NO" "codex debug models listed no models"; miss; return
+  fi
+  if run_limited "$secs" "$deep_tmp/codex-bundled.json" /dev/null codex debug models --bundled \
+     && cmp -s -- "$deep_tmp/codex-bundled.json" "$json"; then
+    src="bundled, no account list"
+  else
+    src="account list"
+    cache="${CODEX_HOME:-$HOME/.codex}/models_cache.json"
+    if have jq; then fetched="$(jq -r '.fetched_at // empty' "$cache" 2>/dev/null)"
+    else fetched="$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1])).get("fetched_at") or "")' "$cache" 2>/dev/null)"
+    fi
+    fetched="$(printf '%s' "$fetched" | sed 's/\.[0-9]*//')"
+    [ -z "$fetched" ] || src="account list fetched $fetched"
+  fi
+
+  set -- "Codex catalog: GPT lane"   GPT_REVIEWER_MODEL      GPT_REVIEWER_EFFORT \
+         "Codex catalog: builder"    CODEX_BUILDER_MODEL     CODEX_BUILDER_EFFORT \
+         "Codex catalog: scout"      CODEX_SCOUT_MODEL       CODEX_SCOUT_EFFORT \
+         "Codex catalog: researcher" CODEX_RESEARCHER_MODEL  CODEX_RESEARCHER_EFFORT
+  while [ "$#" -gt 0 ]; do
+    label="$1"; mk="$2"; ek="$3"; shift 3
+    if ! roster_read "$mk"; then row "$label" "$NO" "$roster_err"; miss; continue; fi
+    model="$roster_val"
+    if ! roster_read "$ek"; then row "$label" "$NO" "$roster_err"; miss; continue; fi
+    effort="$roster_val"
+    # ENVIRON, not awk -v: -v would interpret backslash escapes in the slug.
+    line="$(M="$model" awk -F "$tab" '$1 == ENVIRON["M"] { print; exit }' "$tsv")"
+    if [ -z "$line" ]; then
+      offered="$(awk -F "$tab" '$3 == "list" { printf "%s%s", sep, $1; sep = ", " }' "$tsv")"
+      row "$label" "$NO" "$model not in Codex catalog ($src); offered: $offered"; miss; continue
+    fi
+    efforts="$(printf '%s\n' "$line" | cut -f2)"
+    if [ -z "$efforts" ]; then
+      row "$label" "$OK" "$model, $effort in Codex catalog ($src); effort unverified, catalog lists none"; ok=$((ok+1))
+    else
+      case ",$efforts," in
+        *",$effort,"*) row "$label" "$OK" "$model, $effort in Codex catalog ($src)"; ok=$((ok+1)) ;;
+        *) row "$label" "$NO" "$model has no effort $effort in Codex catalog ($src); offers ${efforts//,/, }"; miss ;;
+      esac
+    fi
+  done
 }
 
 echo
@@ -214,6 +360,8 @@ else
   pin_row "GPT lane" GPT_REVIEWER_MODEL GPT_REVIEWER_EFFORT
   pin_row "Kimi lane" KIMI_REVIEWER_MODEL KIMI_REVIEWER_VARIANT
   pin_row "Claude lane" CLAUDE_REVIEWER_MODEL CLAUDE_REVIEWER_EFFORT
+  # Without codex on PATH the "Codex agent files" row above already says so.
+  if [ "$deep" = 1 ] && have codex; then codex_catalog_checks; fi
 fi
 required=0
 
@@ -289,12 +437,22 @@ if [ "$kimi_pinned" = 0 ] || [ -z "$kimi_model" ]; then
   row "Kimi (via OpenCode)" "$NO" "$kimi_pin"
 elif have opencode && have srt; then
   if [ "$deep" = 1 ]; then
-    # -x -F --: the pin is a literal to match whole-line, not a regex; a slug
-    # with a '.' or a '+' in it would otherwise match the wrong catalog entry.
-    if opencode models 2>/dev/null | grep -qxF -- "$kimi_model"; then
-      row "Kimi (via OpenCode)" "$OK" "$kimi_pin available"; lanes=$((lanes+1))
+    # A model id in `opencode models` proved nothing: a build whose prompt path
+    # crashes lists it just the same. So send one real prompt through the
+    # wrapper the lane really uses, and call the lane live only on a real answer.
+    # PONG is matched in stdout alone: the prompt itself says PONG and an error
+    # path may echo it.
+    kimi_secs=120
+    run_limited "$kimi_secs" "$deep_tmp/kimi.out" "$deep_tmp/kimi.err" \
+      env TMPDIR="$deep_tmp" "$repo/delegate-build/sandbox/kimi-review.sh" \
+      "Reply with exactly PONG and nothing else."
+    kimi_rc=$?
+    if [ "$kimi_rc" = 124 ]; then
+      row "Kimi (via OpenCode)" "$NO" "prompt timed out after $kimi_secs s; $kimi_pin"
+    elif [ "$kimi_rc" -eq 0 ] && grep -q PONG "$deep_tmp/kimi.out"; then
+      row "Kimi (via OpenCode)" "$OK" "$kimi_pin answered a real prompt"; lanes=$((lanes+1))
     else
-      row "Kimi (via OpenCode)" "$NO" "$kimi_model not in 'opencode models'"
+      row "Kimi (via OpenCode)" "$NO" "no PONG reply (wrapper exit $kimi_rc): $(probe_error_line "$deep_tmp/kimi.err" "$deep_tmp/kimi.out"); $kimi_pin"
     fi
   else
     row "Kimi (via OpenCode)" "$OK" "opencode + srt present; $kimi_pin unverified (--deep to check)"; lanes=$((lanes+1))
