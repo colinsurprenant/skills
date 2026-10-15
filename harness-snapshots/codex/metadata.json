@@ -1,7 +1,7 @@
 {
   "active_source": "config",
   "arch": "aarch64-apple-darwin",
-  "binary_sha256": "16593cc2f422d5f398a8e40f550ebbaf1245392528957be342c295920a300704",
+  "binary_sha256": "12ac11d2c7eee27cfae34393986d7b7c9ed0dea537cb749831cdd7033893e6de",
   "configured_model": "gpt-6-astra",
   "prompts": [
     {
@@ -33,17 +33,17 @@
     },
     {
       "active": false,
-      "bytes": 21009,
+      "bytes": 21158,
       "file": "prompt-4.txt",
       "models": [],
-      "sha256": "0b724c100d94f9b8738a1f374eb6050890cdfd2ca386fd2660a16023bf2da397"
+      "sha256": "4745c88f3e25bb42ee8fb94a744f3c4bbb4e51029006b6ea2e47fc7f8068e00b"
     },
     {
       "active": false,
-      "bytes": 20968,
+      "bytes": 21016,
       "file": "prompt-5.txt",
       "models": [],
-      "sha256": "dc7b62c9d74f67ead2796a189bea91bf45355c46c674e5b302ded66c8fb6fa68"
+      "sha256": "538ab92c352ac4f2df1e786b4100f4fae7231be85810776c9a05048d670e1c97"
     },
     {
       "active": false,
@@ -104,5 +104,5 @@
       "sha256": "f47fbb2bdba5e7528bfae7f5e2844a7d45a3a922fa74b718f22b22917376cfcf"
     }
   ],
-  "version": "0.159.2"
+  "version": "0.161.0"
 }
