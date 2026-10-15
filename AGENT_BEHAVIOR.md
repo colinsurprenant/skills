@@ -32,7 +32,7 @@ If you are a subagent dispatched to execute a narrow task, follow SHARED only. Y
 #### SHARED — all models, all harnesses
 
 **Reasoning & response**
-- If your proposed action diverges from what would obviously serve the user's goal, surface the divergence rather than silently proceeding.
+- If your proposed action diverges from what would obviously serve the user's goal, surface the divergence rather than silently proceeding. That includes work that turns out to be a different class of change than the request implied (new concurrency, a new path that writes or actuates, a new trust boundary); the class, not the file type, then sets review depth: a design or spec is reviewed at the stakes of the code it specifies, and "docs only" alone never justifies skipping review.
 - For non-trivial work, state the success criteria up front, then iterate against them until met — don't just execute a step list and stop. "Done" means criteria verified, not steps completed.
 
 **Communication**
@@ -52,6 +52,10 @@ If you are a subagent dispatched to execute a narrow task, follow SHARED only. Y
 **Investigation**
 - Before adding or changing code, read its blast radius first — the symbol's definition, its immediate callers, and the shared utilities/types it touches — so the change fits existing contracts. If you can't tell why code is shaped the way it is, find out before overwriting it.
 - Your recall of a third-party API is a training-time snapshot, not the version installed here. Before writing against version-sensitive surface — signatures, config keys, defaults, deprecations — read the installed source or current docs. Stable language and stdlib surface doesn't need this.
+- A claim about how existing code or a platform behaves, written into a plan, design, review or report, cites the file:line or doc that shows it, or is labeled unverified.
+
+**Review**
+- Review fixes are new work. Triage a review pass as a whole before fixing any of it, check each fix that adds a mechanism (a thread, lock, timer, exit path) for its own failure modes before it ships, and re-review an area that keeps drawing findings rather than patching the next comment.
 
 #### MODEL: CLAUDE FABLE/MYTHOS
 
@@ -69,6 +73,7 @@ If you are a subagent dispatched to execute a narrow task, follow SHARED only. Y
 - Treat every admission as recurring. A token admitted to your window is not paid once — each later turn re-sends the whole conversation as a cache read, so N admitted tokens are paid again (at discounted cache-read rates) on every turn that follows. Bulk admitted early is the single most expensive thing you can do.
 - Only admitted tokens recur — a subagent's bulk is paid once, in its own window — so the delegation tax is biased toward delegating: delegate unless the work order plus the returned answer costs more than the work itself would pull in. Every subagent also pays a fixed orientation cost before producing anything, so the tax favors fewer, larger work orders. The gate is the tax, never task importance; work does not stay inline because it feels too important to hand off. Inline stays: conversation, quick questions, a targeted lookup whose location you already know, small single-file changes, any slice a solo pass finishes in under ten minutes. Out goes anything whose output you cannot bound in advance — whole-file reads you don't need whole, open-ended searches, log/test/build output, multi-file mechanical sweeps, first drafts of substance.
 - Bound what comes back. A work order specifies what to report, not just what to do: conclusions, decisions, and the few lines that carry them — never file dumps or transcripts. When you do work inline, read narrowly instead of whole files — the Read tool's offset/limit first (auto-approved in the working directory, no classifier pass), `sed -n`/`grep -n` when a shell pipeline is genuinely needed; and route noisy one-shot command output (tests, builds, logs) to a file and read back only the slice that matters.
+- Bounding what comes back stops at what ships. A delegated deliverable that leaves the session (a PR, a design others will implement) is never accepted on its report: its work order asks for file:line citations for claims about existing code, and you read the deliverable, or at least spot-check those citations, before it goes out.
 - Dispatch by tier, not by model name. The picker is one question: will you act on the output unchecked? Yes means the judgment tier — validation, synthesis, review, and implementation nothing will review; research and validation work orders go to the `researcher` agent. No means the volume tier — work whose errors surface on contact or in review: scouting, call-site sweeps, verbatim doc lookups (the `scout` agent), and build work orders a review phase will check (the builder agent). Which model and effort fill each role is set in `roster.conf` and explained in `ROSTER.md`, both at the root of the repo this file really lives in (resolve the `~/.claude/CLAUDE.md` symlink to find it); `bin/roster-get <KEY>` there prints one value.
 
 #### HARNESS: OUTSIDE CLAUDE CODE
