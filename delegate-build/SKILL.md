@@ -181,6 +181,8 @@ ask first), or skip the phase.
 Skipping this phase is allowed for low-stakes changes (Phase 3 plus passing
 tests), but announce it like a lane skip: say you are skipping Phase 4 and
 name what makes the change low-stakes (size, blast radius, reversibility).
+A change with nothing to test, such as a spec or design, cannot take this skip
+on Phase 3 alone: its stakes are those of the code it specifies.
 
 ## Phase 5 — Triage and close (here, on the main loop)
 
