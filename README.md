@@ -127,8 +127,8 @@ and supervision rather than model goodwill:
   Anthropic's [`@anthropic-ai/sandbox-runtime`](https://www.npmjs.com/package/@anthropic-ai/sandbox-runtime)
   by [delegate-build/sandbox/kimi-review.sh](delegate-build/sandbox/kimi-review.sh):
   repo readable but not writable, writes confined to OpenCode's own state
-  dirs and temp space, network confined to the Kimi API and OpenCode's model
-  catalogs. Fails closed when srt is missing rather than degrading to an
+  dirs and temp space, network confined to the Kimi API, OpenCode's model
+  catalogs, and loopback (OpenCode 2's local server needs it). Fails closed when srt is missing rather than degrading to an
   unsandboxed run. The repo stays read-only only outside those writable
   roots: a repo under OpenCode's state dirs or the temp space (`/tmp`,
   `/private/tmp`, `/private/var/folders`) is writable.

@@ -71,8 +71,9 @@ nor writes a Codex trust entry. Kimi and Claude (opt-in) run from Codex through
 the `delegate-build/sandbox/*.sh` wrappers, escalated because srt cannot start
 inside Codex's sandbox.
 
-`$KIMI_REVIEWER_VARIANT` is opencode's provider-specific reasoning effort and may be
-empty, which means take the provider default. What value form each key accepts
+`$KIMI_REVIEWER_VARIANT` is opencode's provider-specific reasoning effort (the
+model's `#variant` suffix in OpenCode 2) and may be empty, which means take the
+provider default. What value form each key accepts
 (alias, full model id, provider slug, effort level) is documented per key in
 `roster.conf`, along with the policy behind it: the Anthropic keys hold aliases
 so the whole roster floats to the latest release together.

@@ -20,8 +20,8 @@ repo="$(CDPATH='' cd -P -- "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 file="$repo/roster.conf"
 
 # Keys allowed to hold an empty value. Empty is a real setting for these (see
-# KIMI_REVIEWER_VARIANT: omit opencode's --variant and take the provider
-# default); for every other key an empty value is a half-finished edit, not a
+# KIMI_REVIEWER_VARIANT: no #variant suffix on the opencode model, so the
+# provider default applies); for every other key an empty value is a half-finished edit, not a
 # choice.
 optional_empty=" KIMI_REVIEWER_VARIANT "
 

@@ -154,19 +154,23 @@ in-session fallback the mechanics file names, if it names one (Anthropic-billed,
 ask first), or skip the phase.
 
 - **GPT**: the mechanics file says how to invoke it, pin it and confine it.
-- **Kimi (via OpenCode)**: the wrapper pins the model (and optional `--variant`
-  effort) from `roster.conf` and runs `opencode run` under srt: writes
-  confined to OpenCode's state dirs and temp space, network to the Kimi API
-  and model catalogs, repo read-only unless it sits under one of those
+- **Kimi (via OpenCode)**: the wrapper pins the model (and optional `#variant`
+  effort) from `roster.conf` and runs OpenCode 2's `opencode run --standalone`
+  under srt: writes confined to OpenCode's state dirs and temp space, network
+  to the Kimi API and model catalogs, plus listening on any interface and
+  connecting out to loopback (OpenCode 2's private server needs it, so the
+  lane does not contain a deliberate escape through a local service; the
+  OpenCode service password and Claude Code IDE tokens stay unreadable), repo
+  read-only unless it sits under one of those
   writable roots (OpenCode's state dirs, `/tmp`, `/private/tmp`,
   `/private/var/folders`). If srt is missing the wrapper refuses;
   report it and let the user decide, never fall back to a bare
   `opencode run`. "Error starting FSEvents stream" is benign sandbox noise.
-  Gotcha: `opencode run` can exit 0 with NO final message when
-  a permission auto-reject kills the run (e.g. a `cd` outside the project), so
-  instruct the reviewer: no `cd`, read-only tools, and it MUST end with the
-  deliverable. The wrapper tees stdout to a temp report file (path on stderr
-  at launch), so a finished review survives a killed run.
+  On OpenCode 2 a refused permission returns an error to the reviewer and the
+  run goes on (1.x's run-killing auto-reject is gone), but still instruct it:
+  read-only tools, and it MUST end with the deliverable. The wrapper tees
+  stdout to a temp report file (path on stderr at launch), so a finished
+  review survives a killed run.
 - **Claude (OPT-IN — costs Anthropic tokens)**: the wrapper runs headless
   `claude -p` under srt, pinned to the model and effort in `roster.conf`,
   read-only at two layers (tool allowlist + OS boundary; for a repo inside a
