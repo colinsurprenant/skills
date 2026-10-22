@@ -70,10 +70,13 @@ model_arg="$kimi_model${kimi_variant:+#$kimi_variant}"
 # don't have it these two layers cost nothing and can stay as-is.
 # Two layers keep Director out of this lane (seen live: a `director emit`
 # attempt was rejected by srt and lost a finished review's report):
-#   1. DIRECTOR_BIN=/dev/null — the universal kill switch both the OpenCode
-#      plugin and the CC shims honor: sole resolution candidate, non-executable,
-#      so every hook degrades to a no-op. No digest injection, no fleet rows —
-#      the reviewer never hears about Director at all.
+#   1. DIRECTOR_DISABLE=1 — Director's opt-out: the OpenCode plugin registers
+#      no handlers and every `director _hook` no-ops. DIRECTOR_BIN=/dev/null
+#      beside it covers installs that predate the opt-out: sole resolution
+#      candidate, non-executable, so every hook degrades to a no-op. No digest
+#      injection, no fleet rows — the reviewer never hears about Director at
+#      all. The plugin reads its server process's environment, so both reach
+#      it only because the lane runs --standalone.
 #   2. The preamble below — covers what the kill switch can't: Kimi reading
 #      about the director CLI in ambient repo docs and trying it anyway.
 # Deliver the verdict on stdout; the orchestrating session records it. Stdout
@@ -96,7 +99,7 @@ verdict as your final message — the session that launched you records it."
 export KIMI_REVIEW_PROMPT="$preamble $1"
 
 # \$KIMI_REVIEW_PROMPT is escaped so the INNER shell expands it, not this one.
-cmd="DIRECTOR_BIN=/dev/null opencode run --standalone -m $(printf '%q' "$model_arg") \"\$KIMI_REVIEW_PROMPT\""
+cmd="DIRECTOR_DISABLE=1 DIRECTOR_BIN=/dev/null opencode run --standalone -m $(printf '%q' "$model_arg") \"\$KIMI_REVIEW_PROMPT\""
 
 if [ -n "$dry_run" ]; then
   printf '%s\n' "$cmd"

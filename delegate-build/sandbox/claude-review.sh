@@ -75,8 +75,9 @@ rubric="$(awk 'f>1; /^---[[:space:]]*$/{f++}' "$rubric_file")"
 # srt-specific addendum only. The read-only contract, the no-director rule, and
 # the deliverable format all come from the rubric above.
 # env -u CLAUDECODE: the child must not think it's nested inside this session.
-# DIRECTOR_BIN=/dev/null: same two-layer Director kill as the Kimi lane — sole
-#   resolution candidate, non-executable, so every hook degrades to a no-op.
+# DIRECTOR_DISABLE=1 DIRECTOR_BIN=/dev/null: same two-layer Director kill as
+#   the Kimi lane — Director's opt-out no-ops every hook, and the /dev/null
+#   sole resolution candidate does the same on installs that predate it.
 #   Director is my separate session-coordination CLI, not part of this repo; if
 #   you don't have it this costs nothing and can stay as-is.
 # --strict-mcp-config with no --mcp-config: zero MCP servers — none are needed
@@ -102,7 +103,7 @@ $1"
 # \$CLAUDE_REVIEW_PROMPT is escaped so the INNER shell expands it, not this one.
 # Prompt goes right after -p: --allowedTools is variadic and would swallow a
 # trailing positional argument.
-cmd="env -u CLAUDECODE DIRECTOR_BIN=/dev/null claude -p \"\$CLAUDE_REVIEW_PROMPT\" --model $(printf '%q' "$claude_model") --effort $(printf '%q' "$claude_effort") --strict-mcp-config --allowedTools 'Read,Grep,Glob,Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git status:*)'"
+cmd="env -u CLAUDECODE DIRECTOR_DISABLE=1 DIRECTOR_BIN=/dev/null claude -p \"\$CLAUDE_REVIEW_PROMPT\" --model $(printf '%q' "$claude_model") --effort $(printf '%q' "$claude_effort") --strict-mcp-config --allowedTools 'Read,Grep,Glob,Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git status:*)'"
 
 if [ -n "$dry_run" ]; then
   printf '%s\n' "$cmd"
