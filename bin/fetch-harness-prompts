@@ -13,6 +13,7 @@ because Claude Code's prompt can only be read from inside a live session.
 import argparse
 import hashlib
 import json
+import re
 import subprocess
 import sys
 import tomllib
@@ -38,7 +39,14 @@ CODEX_ACTIVE_SECTIONS = (
 MIN_PROMPT_BYTES = 2000
 
 OPENCODE_SEED_REPO = "sst/opencode"
-OPENCODE_PROMPT_DIR = "packages/opencode/src/session/prompt"
+# OpenCode 2 layout, as (directory, filename test). A session's base prompt is
+# runner/prompt/system.txt, whose ${OPENCODE_TOOL_GUIDANCE} is filled in from
+# session/system-prompt.ts; the per-model prompts sit under plugin/system-prompt.
+OPENCODE_PROMPT_SOURCES = (
+    ("packages/core/src/session/runner/prompt", lambda name: name.endswith(".txt")),
+    ("packages/core/src/session", lambda name: name == "system-prompt.ts"),
+    ("packages/core/src/plugin/system-prompt", lambda name: name.endswith(".txt")),
+)
 GITHUB_API = "https://api.github.com"
 USER_AGENT = "fetch-harness-prompts"
 
@@ -388,10 +396,11 @@ def opencode_version():
         die(f"`opencode --version` failed: {exc}")
     if result.returncode != 0:
         die(f"`opencode --version` exited {result.returncode}: {result.stderr.strip()}")
-    version = result.stdout.strip()
-    if not version:
-        die("`opencode --version` printed nothing")
-    return version
+    # 1.x printed a bare "1.18.30"; 2.x prints "opencode v2.1.0"
+    match = re.search(r"\d+(?:\.\d+)+", result.stdout)
+    if not match:
+        die(f"no version number in `opencode --version` output: {result.stdout.strip()!r}")
+    return match.group()
 
 
 def build_opencode():
@@ -417,30 +426,38 @@ def build_opencode():
     if not commit:
         die(f"could not resolve {full_name}@{ref} to a commit")
 
-    listing = github_json(
-        f"{GITHUB_API}/repos/{full_name}/contents/{OPENCODE_PROMPT_DIR}?ref={commit}"
-    )
-    if not isinstance(listing, list):
-        die(f"{OPENCODE_PROMPT_DIR} is not a directory in {full_name}@{commit}")
-
     files = {}
-    for item in listing:
-        if item.get("type") != "file" or not item["name"].endswith(".txt"):
-            continue
-        url = item.get("download_url") or ""
-        # a listing read at a commit hands back commit-pinned raw URLs; refuse
-        # anything else rather than quietly downloading from a moving ref
-        if commit not in url:
-            die(f"{item['name']}: download URL {url!r} is not pinned to {commit}")
-        body = github_bytes(url)
-        # a wrong ref yields a 14-byte '404: Not Found' body with a 200 status --
-        # match it whole, so a real prompt that opens with '404' is not discarded
-        if body.strip() == b"404: Not Found":
-            die(f"{item['name']}: 404 body from {full_name}@{commit}")
-        files[item["name"]] = body
-
-    if not files:
-        die(f"no prompt files found in {full_name}@{commit}:{OPENCODE_PROMPT_DIR}")
+    paths = {}
+    for directory, wanted in OPENCODE_PROMPT_SOURCES:
+        listing = github_json(
+            f"{GITHUB_API}/repos/{full_name}/contents/{directory}?ref={commit}"
+        )
+        if not isinstance(listing, list):
+            die(f"{directory} is not a directory in {full_name}@{commit}")
+        matched = 0
+        for item in listing:
+            if item.get("type") != "file" or not wanted(item["name"]):
+                continue
+            # snapshots are flat, so two sources must never share a filename
+            if item["name"] in files:
+                die(f"{item['name']}: found in both {paths[item['name']]} and {directory}")
+            url = item.get("download_url") or ""
+            # a listing read at a commit hands back commit-pinned raw URLs; refuse
+            # anything else rather than quietly downloading from a moving ref
+            if commit not in url:
+                die(f"{item['name']}: download URL {url!r} is not pinned to {commit}")
+            body = github_bytes(url)
+            # a wrong ref yields a 14-byte '404: Not Found' body with a 200 status --
+            # match it whole, so a real prompt that opens with '404' is not discarded
+            if body.strip() == b"404: Not Found":
+                die(f"{item['name']}: 404 body from {full_name}@{commit}")
+            files[item["name"]] = body
+            paths[item["name"]] = f"{directory}/{item['name']}"
+            matched += 1
+        # a source that matches nothing means upstream moved a prompt; a partial
+        # snapshot would read as that prompt being deleted
+        if not matched:
+            die(f"no prompt files matched in {full_name}@{commit}:{directory}")
 
     metadata = {
         "version": version,
@@ -448,7 +465,7 @@ def build_opencode():
         "ref": ref,
         "commit": commit,
         "files": [
-            {"file": name, "sha256": sha256(body), "bytes": len(body)}
+            {"file": name, "path": paths[name], "sha256": sha256(body), "bytes": len(body)}
             for name, body in sorted(files.items())
         ],
     }
@@ -465,8 +482,9 @@ def write_snapshot(harness, files, metadata):
     directory = SNAPSHOT_ROOT / harness
     directory.mkdir(parents=True, exist_ok=True)
     # clear managed files first so a drop in prompt count cannot strand a stale one
-    for stale in directory.glob("*.txt"):
-        stale.unlink()
+    for pattern in ("*.txt", "*.ts"):
+        for stale in directory.glob(pattern):
+            stale.unlink()
     for name, body in sorted(files.items()):
         (directory / name).write_bytes(body)
     (directory / "metadata.json").write_text(to_json(metadata), encoding="utf-8")

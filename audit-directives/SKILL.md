@@ -40,10 +40,13 @@ audit is not.
 
 ## Step 2 — Detect drift
 
-`git add -N harness-snapshots/ && git diff harness-snapshots/`
+`git add -N harness-snapshots/ && git diff HEAD -- harness-snapshots/`
 
 (`add -N` makes brand-new files — a first baseline, a prompt file a release
-added — show up in the diff; plain `git diff` silently skips untracked files.)
+added — show up in the diff; plain `git diff` silently skips untracked files.
+Diff against `HEAD`, not the index: `add -N` on the directory also stages the
+removal of deleted files, so a prompt a release dropped vanishes from a plain
+`git diff` — seen on OpenCode 2, which dropped the file K3 used to receive.)
 
 The diff IS the change detector. The audit's scope is the changed files only —
 a harness whose files are unchanged has nothing to audit, provided its
@@ -149,12 +152,16 @@ codex/opencode snapshots (the gitignored claude-code/ snapshot stays local).
 - Codex's "Sandbox and approvals" section is injected at runtime from config, not
   baked into the binary. Its absence from a snapshot is expected, not drift.
 - OpenCode selects its prompt file per provider, and the mapping is not the
-  obvious one: a Kimi K3 session (verified live, 2026-07-28) receives
-  `default.txt`, NOT `kimi.txt`. Audit the file the session actually gets; if
-  the provider or OpenCode version changes, re-verify with an introspection
-  probe (`opencode run` asking for verbatim quotes of the prompt's first
-  sentence and any comment instructions) and match the quotes against the
-  snapshot files.
+  obvious one: on OpenCode 2.1.0 a Kimi K3 session (verified live,
+  2026-10-21) receives the base `system.txt`, with `${OPENCODE_TOOL_GUIDANCE}`
+  filled in from `system-prompt.ts`, NOT `kimi.txt` (on 1.x it received
+  `default.txt`, a file 2.x dropped). Audit the file the session actually
+  gets; if the provider or OpenCode version changes, re-verify with an
+  introspection probe asking for verbatim quotes of the prompt's first
+  sentence and any comment instructions, and match the quotes against the
+  snapshot files. Run the probe through the sandboxed lane,
+  `delegate-build/sandbox/kimi-review.sh "<probe>"`: a plain `opencode run`
+  on 2.x executes in the background service, outside any sandbox.
 - [CL4R1T4S](https://github.com/elder-plinius/CL4R1T4S) can corroborate
   model-level prompt language (claude.ai surfaces), but carries no current
   Claude Code harness prompt and is AGPL-3.0 — cross-check against it if
