@@ -2,8 +2,8 @@
   "filesystem": {
     "denyRead": [
       "~/.ssh",
-      "~/.config/opencode/service*.json",
-      "~/.local/state/opencode/service*.json",
+      "~/.config/opencode/service*.json*",
+      "~/.local/state/opencode/service*.json*",
       "~/.claude/ide"
     ],
     "allowWrite": [
@@ -16,7 +16,7 @@
     ],
     "denyWrite": [
       "~/.director",
-      "~/.local/state/opencode/service*.json"
+      "~/.local/state/opencode/service*.json*"
     ]
   },
   "network": {
