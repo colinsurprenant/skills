@@ -157,9 +157,10 @@ ask first), or skip the phase.
 - **Kimi (via OpenCode)**: the wrapper pins the model (and optional `#variant`
   effort) from `roster.conf` and runs OpenCode 2's `opencode run --standalone`
   under srt: writes confined to OpenCode's state dirs and temp space, network
-  to the Kimi API and model catalogs plus loopback (OpenCode 2's private
-  server needs it; the OpenCode service password and Claude Code IDE tokens
-  stay unreadable), repo read-only unless it sits under one of those
+  to the Kimi API and model catalogs, plus listening on any interface and
+  connecting out to loopback (OpenCode 2's private server needs it; the
+  OpenCode service password and Claude Code IDE tokens stay unreadable, and
+  the environment is an allowlist), repo read-only unless it sits under one of those
   writable roots (OpenCode's state dirs, `/tmp`, `/private/tmp`,
   `/private/var/folders`). If srt is missing the wrapper refuses;
   report it and let the user decide, never fall back to a bare

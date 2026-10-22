@@ -12,10 +12,11 @@
 # private one inside this sandbox; without it, `run` uses the per-user
 # background service, which runs outside the sandbox. The server needs a
 # loopback port, and srt opens loopback for all ports or none, so the
-# reviewer can reach every local service. The settings deny reads of the
-# credentials for the two that would run a tool outside the sandbox: the
-# OpenCode background service (service.json) and the Claude Code IDE servers
-# (~/.claude/ide).
+# reviewer can reach every local service. It gets no credential for one: the
+# settings deny reads of the OpenCode service password (service*.json, writes
+# denied too, since a rename inside its writable dir would carry it past the
+# read deny) and of the Claude Code IDE tokens (~/.claude/ide), and srt starts
+# from an environment allowlist (below).
 # The lane is named for the model family; the pinned model and the provider
 # path behind it are roster.conf's to change.
 set -euo pipefail
@@ -89,7 +90,17 @@ verdict as your final message — the session that launched you records it."
 # a garbled brief and still return a plausible-looking report. srt forwards the
 # environment to the sandboxed command (verified with these settings), so plain
 # POSIX $VAR expansion suffices. Same mechanism as the Claude lane.
-export KIMI_REVIEW_PROMPT="$preamble $1"
+#
+# srt passes its whole environment through, and the reviewer can reach every
+# loopback port, so an ambient token for a local server (an IDE companion's
+# GEMINI_CLI_IDE_AUTH_TOKEN, say) would ride along. srt starts from an
+# allowlist instead, which also holds for tokens nobody has named yet. XDG_*
+# stay out on purpose: the settings file's paths assume the default locations.
+env_args=()
+for v in HOME USER LOGNAME PATH SHELL TMPDIR LANG LC_ALL LC_CTYPE TERM; do
+  if val="$(printenv "$v")"; then env_args+=("$v=$val"); fi
+done
+env_args+=("KIMI_REVIEW_PROMPT=$preamble $1")
 
 # \$KIMI_REVIEW_PROMPT is escaped so the INNER shell expands it, not this one.
 cmd="DIRECTOR_BIN=/dev/null opencode run --standalone -m $(printf '%q' "$model_arg") \"\$KIMI_REVIEW_PROMPT\""
@@ -105,4 +116,4 @@ report="$(mktemp "${TMPDIR:-/tmp}/kimi-review-XXXXXX")"
 echo "kimi-review: tee'ing report to $report" >&2
 
 # No exec: the pipeline needs this shell. pipefail propagates srt's status.
-srt --settings "$dir/kimi-srt-settings.json" -c "$cmd" < /dev/null | tee "$report"
+env -i "${env_args[@]}" srt --settings "$dir/kimi-srt-settings.json" -c "$cmd" < /dev/null | tee "$report"
