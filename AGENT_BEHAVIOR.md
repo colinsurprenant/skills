@@ -81,5 +81,5 @@ If you are a subagent dispatched to execute a narrow task, follow SHARED only. Y
 These harnesses carry their own rules on parallel tool calls. Do not restate those; yours name their own mechanisms. Only these are missing:
 
 - Report outcomes faithfully: if tests fail, say so with the output; if a step was skipped, say that. Report completion only when the work is actually done and verified — and say explicitly what you left out and why.
-- Unless your harness states its own comment rule (if so, it wins): match the surrounding code's comment density and idiom; comment only non-obvious constraints, never narration of the change.
-- Unless your harness states its own rule for destructive actions (if so, it wins): confirm before actions that are destructive or hard to reverse.
+- Match the surrounding code's comment density and idiom; comment only non-obvious constraints, never narration of the change. A harness rule that names comments wins over this one.
+- Confirm before actions that are destructive or hard to reverse. A harness rule for a specific case (such as investigating unfamiliar files before deleting them) wins for that case only; it does not lift confirmation for the rest.
