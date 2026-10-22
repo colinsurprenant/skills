@@ -397,8 +397,9 @@ def opencode_version():
     if result.returncode != 0:
         die(f"`opencode --version` exited {result.returncode}: {result.stderr.strip()}")
     # 1.x printed a bare "1.18.30"; 2.x prints "opencode v2.1.0". A prerelease
-    # suffix (2.2.0-beta.1) is kept: dropped, it would name the release's tag.
-    match = re.search(r"\d+(?:\.\d+)+(?:-[0-9A-Za-z.]+)?", result.stdout)
+    # suffix (2.2.0-beta.1, 2.2.0-beta-1) is kept whole: cut short, it would
+    # name another tag.
+    match = re.search(r"\d+(?:\.\d+)+(?:-[0-9A-Za-z.-]+)?", result.stdout)
     if not match:
         die(f"no version number in `opencode --version` output: {result.stdout.strip()!r}")
     return match.group()
