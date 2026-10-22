@@ -152,14 +152,23 @@ codex/opencode snapshots (the gitignored claude-code/ snapshot stays local).
 - Codex's "Sandbox and approvals" section is injected at runtime from config, not
   baked into the binary. Its absence from a snapshot is expected, not drift.
 - OpenCode selects its prompt file per provider, and the mapping is not the
-  obvious one: on OpenCode 2.1.0 a Kimi K3 session (verified live,
-  2026-10-21) receives the base `system.txt`, with `${OPENCODE_TOOL_GUIDANCE}`
-  filled in from `system-prompt.ts`, NOT `kimi.txt` (on 1.x it received
-  `default.txt`, a file 2.x dropped). Audit the file the session actually
-  gets; if the provider or OpenCode version changes, re-verify with an
-  introspection probe asking for verbatim quotes of the prompt's first
-  sentence and any comment instructions, and match the quotes against the
-  snapshot files. Run the probe through the sandboxed lane,
+  obvious one: on OpenCode 2.1.0 a Kimi K3 session (verified live by section
+  headings, 2026-10-22) receives the base `system.txt`, with
+  `${OPENCODE_TOOL_GUIDANCE}` filled in from `system-prompt.ts`, NOT
+  `kimi.txt` (on 1.x it received `default.txt`, a file 2.x dropped). Audit
+  the file the session actually gets; if the provider or OpenCode version
+  changes, re-verify with an introspection probe asking for every markdown
+  heading in the harness instructions, verbatim and in order, plus any
+  comment instructions, and match the answer against the snapshot files. A
+  first sentence alone does not identify the file: on 2.1.0 `system.txt`,
+  `gpt.txt` and `gpt-astra.txt` open identically and differ only in their
+  sections (`gpt-astra.txt` adds Delegation; `gpt.txt` adds Delegation,
+  Destructive actions and Autonomy). A match that fits more than one
+  snapshot is unverified; say so in the report. The session also gets
+  runtime sections no snapshot holds (`# Your Model`, `# Code Mode`,
+  `## Available tools`); on 2.1.0 their only sentence that bears on a
+  directive is `worktree_remove`'s "Only set this when the user has
+  confirmed forced removal." Run the probe through the sandboxed lane,
   `delegate-build/sandbox/kimi-review.sh "<probe>"`: a plain `opencode run`
   on 2.x executes in the background service, outside any sandbox.
 - [CL4R1T4S](https://github.com/elder-plinius/CL4R1T4S) can corroborate
