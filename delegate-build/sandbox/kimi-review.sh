@@ -8,6 +8,14 @@
 # roots (a checkout in temp space is writable) —
 # OpenCode has no OS-level sandbox of its own, and this lane runs an open-weight
 # model headless, so the boundary must be mechanical, not model judgment.
+# OpenCode 2 runs every session in a server process. --standalone spawns a
+# private one inside this sandbox; without it, `run` uses the per-user
+# background service, which runs outside the sandbox. The server needs a
+# loopback port, and srt opens loopback for all ports or none, so the
+# reviewer can reach every local service. The settings deny reads of the
+# credentials for the two that would run a tool outside the sandbox: the
+# OpenCode background service (service.json) and the Claude Code IDE servers
+# (~/.claude/ide).
 # The lane is named for the model family; the pinned model and the provider
 # path behind it are roster.conf's to change.
 set -euo pipefail
@@ -47,14 +55,12 @@ reader="$root/bin/roster-get"
 }
 
 kimi_model="$("$reader" KIMI_REVIEWER_MODEL)" || exit 78
-# KIMI_REVIEWER_VARIANT is the provider-specific reasoning effort. The key must be present
-# — an absent key is a config fault like any other — but an empty value is a
-# real setting: omit the flag and take the provider default.
+# KIMI_REVIEWER_VARIANT is the provider-specific reasoning effort, passed as
+# OpenCode 2's provider/model#variant suffix. The key must be present — an
+# absent key is a config fault like any other — but an empty value is a real
+# setting: no suffix, and the provider default applies.
 kimi_variant="$("$reader" KIMI_REVIEWER_VARIANT)" || exit 78
-variant_arg=""
-if [ -n "$kimi_variant" ]; then
-  variant_arg=" --variant $(printf '%q' "$kimi_variant")"
-fi
+model_arg="$kimi_model${kimi_variant:+#$kimi_variant}"
 
 # Director is my separate session-coordination CLI, not part of this repo. If you
 # don't have it these two layers cost nothing and can stay as-is.
@@ -86,7 +92,7 @@ verdict as your final message — the session that launched you records it."
 export KIMI_REVIEW_PROMPT="$preamble $1"
 
 # \$KIMI_REVIEW_PROMPT is escaped so the INNER shell expands it, not this one.
-cmd="DIRECTOR_BIN=/dev/null opencode run -m $(printf '%q' "$kimi_model")$variant_arg \"\$KIMI_REVIEW_PROMPT\""
+cmd="DIRECTOR_BIN=/dev/null opencode run --standalone -m $(printf '%q' "$model_arg") \"\$KIMI_REVIEW_PROMPT\""
 
 if [ -n "$dry_run" ]; then
   printf '%s\n' "$cmd"

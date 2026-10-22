@@ -1,7 +1,10 @@
 {
   "filesystem": {
     "denyRead": [
-      "~/.ssh"
+      "~/.ssh",
+      "~/.config/opencode/service.json",
+      "~/.local/state/opencode/service.json",
+      "~/.claude/ide"
     ],
     "allowWrite": [
       "~/.local/share/opencode",
@@ -21,6 +24,7 @@
       "models.dev",
       "models.opencode.ai"
     ],
-    "deniedDomains": []
+    "deniedDomains": [],
+    "allowLocalBinding": true
   }
 }
