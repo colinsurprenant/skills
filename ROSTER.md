@@ -116,8 +116,9 @@ One surface to edit, two to run, and `bin/install` to deliver the Codex copies:
   review lanes against what is actually installed, and prints the pins each
   lane will use. It also verifies the installed Codex agent files whole (a
   changed body or description is drift, not only a changed model or effort).
-  With `codex` on PATH and neither the skill link nor any generated file, it
-  prints one optional "delegate-build not installed for Codex" row instead.
+  With `codex` on PATH and none of the two skill links (delegate-build,
+  copilot-loop) nor any generated file, it prints one optional
+  "delegate-build not installed for Codex" row instead.
 
 Nothing parses `roster.conf` itself: `bin/roster-get` is the one reader every
 consumer goes through (`--file <path>` points it at another roster, for tests),
@@ -170,8 +171,9 @@ run's fix reviews add up, a fix review past the bound included (and named in
 accepted finding, or a new valid finding inside the change can each call for
 the next cycle, and several found on one fix review batch into it. Phase 3 fix
 orders issued before the breadth pass are not fix cycles; they count in
-`bounced`. A deferred follow-up, findings left open at the bound, and any fix
-or lane round past the bound go in `note=`. This definition of `fix_cycles`
+`bounced`. A deferred follow-up, a rejected finding a fix review raised
+again, findings left open at the bound, and any fix or lane round past the
+bound go in `note=`. This definition of `fix_cycles`
 changed 2026-09-28 and again 2026-10-25 (fix reviews after every cycle
 replaced the single confirming pass), so earlier records are not comparable on
 it.

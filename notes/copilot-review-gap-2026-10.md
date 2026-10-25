@@ -19,6 +19,8 @@ in [delegate-build](../delegate-build/SKILL.md) Phases 4 and 5 and in
   the session's adjudication; it did not re-verify each against the code.
   "Accepted" below means accepted by the author or the session, not
   independently confirmed.
+- The per-comment dataset stays private, since it quotes private
+  repositories; this note carries its aggregates only.
 
 ## What the data showed
 
@@ -28,22 +30,23 @@ on the same head, the lanes had raised 8 of Copilot's 21 round-one findings
 agree with itself either: 112 reviews carry a "Previously missed" section
 for code that had not changed since its last review.
 
-**Copilot does not converge.** Rounds per PR: median 2, mean 2.55, maximum
-17. Inline comments per round stay flat, about one per round from round one
-to round six and beyond. Of 60 rounds with no inline comment that were
-followed by another round, 25 (42%) saw a later round find more.
+**Copilot did not converge in this sample.** Rounds per PR: median 2, mean
+2.55, maximum 17. Inline comments per round stayed flat, about one per round
+from round one to round six and beyond. Of 60 rounds with no inline comment
+that were followed by another round, 25 (42%) saw a later round find more.
 
 **Fix code is where later rounds come from.** Of 158 round-two-and-later
 comments whose position could be measured, 28% landed on a line the previous
 round's fix changed and 37% within three lines of one, while a fix round
-changed a median 7% of the PR's added lines: a 4 to 8 times concentration.
+changed a median 7% of the PR's added lines.
 On the 6 PRs whose logs name the exact head the lanes reviewed, 8 of 12
 Copilot round-one comments sat on lines written by fix commits made in
 response to the lanes, which no lane had re-reviewed.
 
 **Lane reports were capped.** Lane requests asked for a ranked report under
-800 to 900 words, and lanes returned 1 to 9 findings per pass. Copilot
-records each finding as it reads, with no cap.
+800 to 900 words, and lanes returned 1 to 9 findings per pass. Copilot's
+agents record findings through a tool call as they read (seen in its job
+logs), and we saw no cap on their number.
 
 **Smaller causes.** Lane findings deferred in triage came back as Copilot
 comments (on one PR, 3 of 5 round-one comments). Only Copilot checked the

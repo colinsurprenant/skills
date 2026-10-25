@@ -53,7 +53,7 @@ agent files it generated earlier, and only when
 `~/.agents/skills/delegate-build` links into the clone it runs from. If
 generated files exist but that link is missing or points at another clone, it
 prints one "not refreshed" row, touches nothing and does not fail; if none
-exist it says nothing. It never creates Codex files or the `~/.agents` link.
+exist it says nothing. It never creates Codex files or the `~/.agents` links.
 
 ## Update
 
@@ -92,7 +92,7 @@ which delegate-build review lanes are live. Run it again after any step below.
 Its optional Codex rows cover the `~/.agents/skills/delegate-build` and
 `~/.agents/skills/copilot-loop` links and each generated agent file, checked whole against `roster.conf` and the
 `agents/*.md` bodies (drift names `bin/install --codex` as the fix). With
-`codex` on PATH and neither that link nor any generated file, they collapse to
+`codex` on PATH and neither of those links nor any generated file, they collapse to
 one row saying delegate-build is not installed for Codex; without `codex` on
 PATH, the link rows stay and the agent-file rows give way to one row saying
 Codex is not installed.

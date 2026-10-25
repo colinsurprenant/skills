@@ -211,9 +211,9 @@ Copilot rounds).
 The bound below protects one invariant: no line reaches the PR that no lane
 has read. Fix code is where later review rounds come from (2026-10 sample: on
 the PRs where it could be measured, 8 of 12 Copilot round-one comments sat on
-lines written by lane-driven fixes, and later Copilot rounds land 4 to 8 times
-more densely on the previous round's fix code), so every fix cycle ends in a
-fix review.
+lines written by lane-driven fixes, and 28% of later-round comments landed on
+a line the previous round's fix changed, while a fix round changed a median
+7% of the PR's added lines), so every fix cycle ends in a fix review.
 
 Adjudicate every lane's findings together (expect noise). A valid finding is
 fixed unless it lies outside the change (pre-existing code or behavior the
@@ -224,10 +224,11 @@ comments were lane findings deferred in triage).
 
 A fix cycle: dispatch the accepted fixes to the builder role (one fix order,
 or a few that don't overlap). Each fix order fixes by class: for each finding
-it names the defect class, and the builder searches the lines the change adds
-or modifies for other instances, fixes them, and reports where it looked; an
-instance in code the change does not touch is reported, not fixed, and
-deferred as above.
+it names the defect class, and the builder fixes every instance the change is
+responsible for, in the lines it adds or modifies and in code whose behavior
+it alters (a caller of a contract it changed, a reader of a format it
+changed), and reports where it looked; an instance the change neither touches
+nor affects is pre-existing, reported, not fixed, and deferred as above.
 Review the result as in Phase 3; that review may send back at most one narrow
 correction to the same builder, never a new order. Commit the fix tree and
 announce the base (the last lane-reviewed head) and the new head.
