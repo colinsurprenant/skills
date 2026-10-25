@@ -127,9 +127,9 @@ Workers already running keep going, and their reports wait for your next
 turn.
 
 Everything else SKILL.md asks for is an announcement, not a gate. Skipping
-Phase 4 (name what makes the change low-stakes), dropping an installed lane,
-and in Phase 5 deferring a new finding that is neither a regression nor
-blocking (deferred by default unless the user says otherwise) all follow
+Phase 4 (name the stakes axes you checked), dropping an installed lane, in
+Phase 5 deferring a finding that lies outside the change, and listing the
+findings left open at the fix-cycle bound in the summary all follow
 SKILL.md's own semantics: you announce, the user can veto, and you do not stop
 and wait. The announcement is mandatory before you proceed, every time; it is
 the user's chance to veto, and a veto in chat is honored.

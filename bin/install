@@ -3,7 +3,9 @@
 # default, the optional harness links by flag. Renders agents/*.md frontmatter
 # from roster.conf first, so the links land on current files.
 # --codex also links the delegate-build skill into ~/.agents/skills and renders
-# the delegate-builder, scout and researcher agent files into ~/.codex/agents.
+# the delegate-builder, scout and researcher agent files into ~/.codex/agents;
+# once that link is in place it links copilot-loop beside it, since
+# copilot-loop runs its lanes through delegate-build's mechanics.
 # Those are regular files, not links (Codex refuses a symlinked agent file), so
 # they do not follow a git pull by themselves. A plain run (no --codex)
 # refreshes the ones an earlier run generated, but only when
@@ -164,14 +166,15 @@ if [ "$do_codex" = 1 ]; then
   echo "Codex CLI"
   explicit=1
   link AGENT_BEHAVIOR.md "$HOME/.codex/AGENTS.md"
-  link copilot-loop "$HOME/.agents/skills/copilot-loop"
   # The skill link is what marks the agent files as this clone's, so a refused
   # or failed one means no file is rendered: they would belong to no link.
   if link delegate-build "$codex_skill"; then
+    link copilot-loop "$HOME/.agents/skills/copilot-loop"
     c_out="$("$repo/bin/roster-render" --codex "$codex_dir" 2>&1)"; c_rc=$?
     codex_rows "$c_out" "$c_rc"
   else
     row "$codex_dir" "$NO" "agent files not rendered: the delegate-build skill link above is not in place"
+    row "$HOME/.agents/skills/copilot-loop" "$NO" "not linked: it needs the delegate-build skill link above"
   fi
   explicit=0
 else

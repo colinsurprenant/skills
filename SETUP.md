@@ -46,7 +46,7 @@ under an explicitly requested flag (`--codex`, `--opencode`, `--copilot`,
 `delegate-build` and `copilot-loop` into `~/.agents/skills` and renders three Codex agent files
 (`delegate-builder.toml`, `scout.toml`, `researcher.toml`, pinned from the
 `CODEX_*` keys in `roster.conf`) into `~/.codex/agents` as regular files, since
-Codex refuses symlinked agent files. That skill link is what marks the agent
+Codex refuses symlinked agent files. The delegate-build link is what marks the agent
 files as this clone's: if it is refused or cannot be created, `--codex` renders
 no agent files and exits non-zero. A plain `bin/install` only refreshes the
 agent files it generated earlier, and only when
@@ -67,8 +67,11 @@ is the Codex agent files: they are generated copies, so a pulled change to an
 agent body or a `CODEX_*` pin reaches Codex on the next `bin/install`, which
 refreshes the ones it generated earlier (when `~/.agents/skills/delegate-build`
 links into this clone; see Install). Rerunning `bin/install` also covers a
-pull that introduces a new link; with no Codex agent files to refresh it is a
-no-op otherwise, and it ends with the doctor report.
+pull that introduces a new Claude Code link; with no Codex agent files to
+refresh it is a no-op otherwise, and it ends with the doctor report. A new
+Codex link (such as `~/.agents/skills/copilot-loop`) needs one
+`bin/install --codex`, since a plain run never creates Codex links; until
+then doctor shows it as an unmet optional row.
 
 The build skill and its agents were renamed to model-agnostic names
 (`opus-build` is now `delegate-build`, `opus-builder` is `delegate-builder`,
@@ -91,7 +94,7 @@ Its optional Codex rows cover the `~/.agents/skills/delegate-build` and
 `agents/*.md` bodies (drift names `bin/install --codex` as the fix). With
 `codex` on PATH and neither that link nor any generated file, they collapse to
 one row saying delegate-build is not installed for Codex; without `codex` on
-PATH, the link row stays and the agent-file rows give way to one row saying
+PATH, the link rows stay and the agent-file rows give way to one row saying
 Codex is not installed.
 `bin/doctor --deep` also sends one real prompt through the Kimi lane (so a
 model that is listed but crashes on use shows up) and checks the GPT and Codex

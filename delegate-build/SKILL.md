@@ -123,8 +123,9 @@ reads of the lines it names, never the whole diff (measured in M8 to hold).
 ## Phase 4 — Breadth review (external reviewers)
 
 Lane review runs once as a breadth pass on the branch head here, then once as
-a fix review after each Phase 5 fix cycle, at most three. Then stop; a round
-the user explicitly asks for past that is outside the bound (Phase 5).
+a fix review after each Phase 5 fix cycle; Phase 5 runs at most three fix
+cycles, so at most four lane rounds in all. Then stop; a round the user
+explicitly asks for past that is outside the bound (Phase 5).
 
 First, commit the Phase-3-approved tree (or name the head if already
 committed). Right after, announce the roster in plain text, naming that head
@@ -144,8 +145,8 @@ tests included; Copilot's PR review excludes `bin/` by default, so a lane is
 the only line-level reviewer that code gets. Why: in a 2026-10 sample of 45
 PRs, lanes asked for a capped, ranked report returned 1 to 9 findings each,
 and Copilot then found on the same heads most of what it reported in round
-one without any lane having raised it (about 60% where the logs recorded the
-overlap).
+one without any lane having raised it (13 of 21 where the logs recorded the
+overlap). Sources: `notes/copilot-review-gap-2026-10.md`.
 
 Stakes decide whether this phase runs and whether to escalate to the expensive
 review the mechanics file names, if it names one, never which no-cost lanes
@@ -217,13 +218,16 @@ fix review.
 Adjudicate every lane's findings together (expect noise). A valid finding is
 fixed unless it lies outside the change (pre-existing code or behavior the
 change does not touch); only those are deferred, as follow-ups the summary
-names. Deferring a valid in-scope finding only moves it to a billed Copilot
-round, which raises it again.
+names. A valid in-scope finding deferred to save a cycle tends to come back
+as a billed Copilot comment (on one sampled PR, 3 of Copilot's 5 round-one
+comments were lane findings deferred in triage).
 
 A fix cycle: dispatch the accepted fixes to the builder role (one fix order,
 or a few that don't overlap). Each fix order fixes by class: for each finding
-it names the defect class, and the builder searches the change and the files
-it touches for other instances, fixes them, and reports where it looked.
+it names the defect class, and the builder searches the lines the change adds
+or modifies for other instances, fixes them, and reports where it looked; an
+instance in code the change does not touch is reported, not fixed, and
+deferred as above.
 Review the result as in Phase 3; that review may send back at most one narrow
 correction to the same builder, never a new order. Commit the fix tree and
 announce the base (the last lane-reviewed head) and the new head.
@@ -238,7 +242,8 @@ code the fix wrote or changed, and in callers of what it changed; and the same
 defect class elsewhere in the change. Adjudicate its output:
 
 - A finding rejected in triage and re-raised is re-rejected without a new
-  cycle and counted in the rejected tally.
+  cycle; the per-lane tallies cover the breadth pass only, so the combo-log
+  note mentions it in `note=`.
 - A regression of a fix, an accepted finding still open, or a new valid
   finding inside the change goes into the next fix cycle; one outside the
   change is deferred as above.
@@ -246,7 +251,7 @@ defect class elsewhere in the change. Adjudicate its output:
 
 At most three fix cycles, each followed by its fix review. Valid findings from
 the third fix review are not fixed within the bound: the summary lists them as
-open, and the user decides. A fix made past the bound still gets a fix review
+open, for the user to decide on after the run. A fix made past the bound still gets a fix review
 before it ships, and a lane round the user explicitly asks for past the bound
 takes the last lane-reviewed head as its base; the combo-log note logs either
 as outside the bound.

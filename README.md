@@ -97,11 +97,13 @@ wrap, runs under Claude Code's own permission checks instead.
 - **[copilot-loop/](copilot-loop/SKILL.md)**: the PR review loop with GitHub
   Copilot, run to spend as few billed Copilot rounds as possible. A lane has
   read every line of the head before the first review; each round is read
-  whole (Copilot reports findings on files it excludes, such as `bin/`, only
-  in the review body), fixed by class, and checked by a fix review on the
-  no-cost lanes before the next request; a stop rule ends the loop. It reuses
+  whole (inline comments and the review body, where a finding on a file
+  Copilot excludes, such as a `bin/` script, has shown up with no inline
+  comment), fixed by class, and checked by a fix review on the no-cost lanes
+  before the next request; a stop rule ends the loop. It reuses
   delegate-build's lanes and records each PR's round count to the Director
-  log.
+  log. [notes/copilot-review-gap-2026-10.md](notes/copilot-review-gap-2026-10.md)
+  has the data behind it.
 - **[agents/delegate-builder.md](agents/delegate-builder.md)**,
   **[agents/claude-reviewer.md](agents/claude-reviewer.md)**,
   **[agents/researcher.md](agents/researcher.md)** and

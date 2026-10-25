@@ -161,9 +161,12 @@ span later heads. Phase 5 fix reviews do not increment those counts.
 `fix_cycles` counts Phase 5 fix cycles actually run, 0 to 3, once per cycle
 and not per finding: the triage fix dispatch after the breadth pass is the
 first, and each fix review that leaves something to fix calls for the next.
-`fix_review` counts the valid findings the fix reviews raised (regressions,
-still-open findings, and new defects in fix code together), which is how the
-fix reviews show whether they earn their cost. A regression, a still-open
+`fix_review` counts the distinct valid findings the fix reviews raised, every
+kind a fix review asks for (regressions, still-open findings, new defects in
+fix code, and the same defect class elsewhere in the change): one finding
+raised by two lanes in one fix review counts once, and the counts of the
+run's fix reviews add up, a fix review past the bound included (and named in
+`note=`). That is how the fix reviews show whether they earn their cost. A regression, a still-open
 accepted finding, or a new valid finding inside the change can each call for
 the next cycle, and several found on one fix review batch into it. Phase 3 fix
 orders issued before the breadth pass are not fix cycles; they count in
