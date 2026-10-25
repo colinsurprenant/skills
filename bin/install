@@ -149,6 +149,7 @@ migrate_pre_rename
 link CLAUDE.global.md            "$HOME/.claude/CLAUDE.md"
 link audit-directives            "$HOME/.claude/skills/audit-directives"
 link delegate-build              "$HOME/.claude/skills/delegate-build"
+link copilot-loop                "$HOME/.claude/skills/copilot-loop"
 render_agents
 link agents/delegate-builder.md  "$HOME/.claude/agents/delegate-builder.md"
 link agents/claude-reviewer.md   "$HOME/.claude/agents/claude-reviewer.md"
@@ -163,6 +164,7 @@ if [ "$do_codex" = 1 ]; then
   echo "Codex CLI"
   explicit=1
   link AGENT_BEHAVIOR.md "$HOME/.codex/AGENTS.md"
+  link copilot-loop "$HOME/.agents/skills/copilot-loop"
   # The skill link is what marks the agent files as this clone's, so a refused
   # or failed one means no file is rendered: they would belong to no link.
   if link delegate-build "$codex_skill"; then

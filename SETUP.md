@@ -43,7 +43,7 @@ under an explicitly requested flag (`--codex`, `--opencode`, `--copilot`,
 `--all`) it exits non-zero as well. Otherwise the exit status is doctor's.
 
 `--codex` does more than link: besides the `AGENTS.md` link it links
-`delegate-build` into `~/.agents/skills` and renders three Codex agent files
+`delegate-build` and `copilot-loop` into `~/.agents/skills` and renders three Codex agent files
 (`delegate-builder.toml`, `scout.toml`, `researcher.toml`, pinned from the
 `CODEX_*` keys in `roster.conf`) into `~/.codex/agents` as regular files, since
 Codex refuses symlinked agent files. That skill link is what marks the agent
@@ -86,8 +86,8 @@ yourself:
 
 Reports which tools are installed, which symlinks resolve into this clone, and
 which delegate-build review lanes are live. Run it again after any step below.
-Its optional Codex rows cover the `~/.agents/skills/delegate-build` link and
-each generated agent file, checked whole against `roster.conf` and the
+Its optional Codex rows cover the `~/.agents/skills/delegate-build` and
+`~/.agents/skills/copilot-loop` links and each generated agent file, checked whole against `roster.conf` and the
 `agents/*.md` bodies (drift names `bin/install --codex` as the fix). With
 `codex` on PATH and neither that link nor any generated file, they collapse to
 one row saying delegate-build is not installed for Codex; without `codex` on
@@ -107,6 +107,7 @@ install exits 0.
     ln -s "$REPO/CLAUDE.global.md"            ~/.claude/CLAUDE.md
     ln -s "$REPO/audit-directives"            ~/.claude/skills/audit-directives
     ln -s "$REPO/delegate-build"              ~/.claude/skills/delegate-build
+    ln -s "$REPO/copilot-loop"                ~/.claude/skills/copilot-loop
     ln -s "$REPO/agents/delegate-builder.md"  ~/.claude/agents/delegate-builder.md
     ln -s "$REPO/agents/claude-reviewer.md"   ~/.claude/agents/claude-reviewer.md
     ln -s "$REPO/agents/researcher.md"        ~/.claude/agents/researcher.md
@@ -146,7 +147,8 @@ session and look for "Home copilot-instructions.md" under the User group.
 ## Optional: delegate-build on Codex
 
 `bin/install --codex` also makes delegate-build runnable from a Codex main
-loop: it links the skill into `~/.agents/skills/delegate-build` and renders
+loop: it links the skill into `~/.agents/skills/delegate-build` (and
+`copilot-loop`, which uses delegate-build's lanes, beside it) and renders
 three agent files, `delegate-builder.toml`, `scout.toml` and `researcher.toml`,
 into `~/.codex/agents`. They are generated from the `CODEX_*` keys in
 `roster.conf` plus the bodies of `agents/*.md`, so the instructions have one
@@ -157,6 +159,7 @@ you run it from; it never creates them). The manual equivalent:
 
     mkdir -p ~/.agents/skills
     ln -s "$REPO/delegate-build" ~/.agents/skills/delegate-build
+    ln -s "$REPO/copilot-loop"   ~/.agents/skills/copilot-loop
     "$REPO/bin/roster-render" --codex ~/.codex/agents
 
 `bin/roster-render --codex <dir> [--check] [--refresh]` renders into any

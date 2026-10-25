@@ -122,19 +122,30 @@ reads of the lines it names, never the whole diff (measured in M8 to hold).
 
 ## Phase 4 — Breadth review (external reviewers)
 
-Lane review runs at most twice per build: one breadth pass on the branch head
-here, and one confirming pass on the fixed head in Phase 5. Then stop; a
-round the user explicitly asks for past that is outside the bound (Phase 5).
+Lane review runs once as a breadth pass on the branch head here, then once as
+a fix review after each Phase 5 fix cycle, at most three. Then stop; a round
+the user explicitly asks for past that is outside the bound (Phase 5).
 
 First, commit the Phase-3-approved tree (or name the head if already
 committed). Right after, announce the roster in plain text, naming that head
 SHA and its base: the merge base with the PR's target branch on the breadth
-pass, the breadth-pass head on the confirming pass. Every lane request carries
-both. Every INSTALLED no-cost lane runs once on the breadth head (the Claude
-lane only if the user opted in); the confirming pass runs the lane set Phase 5
-names. The lane of this loop's own lineage is opt-in where the mechanics file
-offers a path to it, and otherwise skipped with kind `<lane>:own-lineage`. No
-fixes land between lanes.
+pass, the last lane-reviewed head on a fix review. Every lane request carries
+both. Every INSTALLED no-cost lane runs once on each reviewed head (the Claude
+lane only if the user opted in). The lane of this loop's own lineage is opt-in
+where the mechanics file offers a path to it, and otherwise skipped with kind
+`<lane>:own-lineage`. No fixes land between lanes.
+
+Every lane request, breadth pass and fix review alike, asks for every finding:
+no word cap, no top-N, no "most severe only". Bound the form, never the count:
+one entry per finding with file:line, severity (high, medium or low), the
+defect in one sentence and a concrete failure scenario. Ask the lane to go
+through every changed file and hunk, docs, specs, scripts, `bin/`, config and
+tests included; Copilot's PR review excludes `bin/` by default, so a lane is
+the only line-level reviewer that code gets. Why: in a 2026-10 sample of 45
+PRs, lanes asked for a capped, ranked report returned 1 to 9 findings each,
+and Copilot then found on the same heads most of what it reported in round
+one without any lane having raised it (about 60% where the logs recorded the
+overlap).
 
 Stakes decide whether this phase runs and whether to escalate to the expensive
 review the mechanics file names, if it names one, never which no-cost lanes
@@ -182,47 +193,73 @@ ask first), or skip the phase.
   the lane is unavailable, and say so. It bills Anthropic tokens, so it is not
   in the default roster: offer it when the user wants an Anthropic-grade pass.
 
-Skipping this phase is allowed for low-stakes changes (Phase 3 plus passing
-tests), but announce it like a lane skip: say you are skipping Phase 4 and
-name what makes the change low-stakes (size, blast radius, reversibility).
-A change with nothing to test, such as a spec or design, cannot take this skip
-on Phase 3 alone: its stakes are those of the code it specifies.
+Skipping this phase is allowed only for a change that is low-stakes on every
+axis: trust (auth, ownership, input validation, secrets, public routes),
+contracts (APIs, payloads, schemas, formats, scripts or prose others
+execute), production data and money, state (lifecycle, concurrency, shared
+state), and reversibility (obvious, caught by tests, trivially undone). One
+failing axis and the lanes run, even on a three-line diff: size alone never
+justifies the skip. Announce it like a lane skip: say you are skipping Phase
+4 and name the axes you checked. A change with nothing to test, such as a spec
+or design, cannot take this skip on Phase 3 alone: its stakes are those of the
+code it specifies (a design doc that skipped the lanes in 2026-10 then took 13
+Copilot rounds).
 
-## Phase 5 — Triage and close (here, on the main loop)
+## Phase 5 — Triage, fix, and fix review (here, on the main loop)
 
-Adjudicate every lane's findings together (expect noise), dispatch the accepted
-fixes to the builder role as cycle one (one fix order, or a few that don't
-overlap), commit the fix tree, and announce the base (the breadth head) and the new head.
+The bound below protects one invariant: no line reaches the PR that no lane
+has read. Fix code is where later review rounds come from (2026-10 sample: on
+the PRs where it could be measured, 8 of 12 Copilot round-one comments sat on
+lines written by lane-driven fixes, and later Copilot rounds land 4 to 8 times
+more densely on the previous round's fix code), so every fix cycle ends in a
+fix review.
 
-Then run ONE confirming pass: only the lanes whose findings were accepted,
-each request carrying that lane's accepted findings and asking for a fixed /
-still-open verdict on each, since base and head alone cannot certify a
-closure or separate a regression from an unrelated new issue.
-Adjudicate its output:
+Adjudicate every lane's findings together (expect noise). A valid finding is
+fixed unless it lies outside the change (pre-existing code or behavior the
+change does not touch); only those are deferred, as follow-ups the summary
+names. Deferring a valid in-scope finding only moves it to a billed Copilot
+round, which raises it again.
+
+A fix cycle: dispatch the accepted fixes to the builder role (one fix order,
+or a few that don't overlap). Each fix order fixes by class: for each finding
+it names the defect class, and the builder searches the change and the files
+it touches for other instances, fixes them, and reports where it looked.
+Review the result as in Phase 3; that review may send back at most one narrow
+correction to the same builder, never a new order. Commit the fix tree and
+announce the base (the last lane-reviewed head) and the new head.
+
+Then the fix review: every installed no-cost lane (the Claude lane only if the
+user opted in) on the fix range, base to new head, with the merge base named
+for context. Each request carries the findings this cycle fixed, every
+lane's and not only its own, and asks, under Phase 4's output rules, for: a
+fixed / still-open verdict on each, since base and head alone cannot certify a
+closure or separate a regression from an unrelated new issue; defects in the
+code the fix wrote or changed, and in callers of what it changed; and the same
+defect class elsewhere in the change. Adjudicate its output:
 
 - A finding rejected in triage and re-raised is re-rejected without a new
   cycle and counted in the rejected tally.
-- A new finding that is not a regression goes into the summary as a deferred
-  follow-up unless the user says otherwise; a blocking one (a security or
-  correctness defect that would not ship as a follow-up) is fixed instead.
-- A regression of a fix, or an accepted finding still open, is fixed, never
-  deferred.
+- A regression of a fix, an accepted finding still open, or a new valid
+  finding inside the change goes into the next fix cycle; one outside the
+  change is deferred as above.
+- A fix review with nothing to fix closes the loop.
 
-Fixes from the confirming pass go out as one fix order, cycle two and the
-last. Its Phase 3 review belongs to cycle two and may send back at most one
-narrow correction to the same builder, never a new order. Anything still open
-after that goes into the summary as open, not fixed, and the summary says
-which fixes no lane re-reviewed. A lane round the user explicitly asks for
-after that is outside the bound: its base is the confirming head, and the
-combo-log note logs it as such.
+At most three fix cycles, each followed by its fix review. Valid findings from
+the third fix review are not fixed within the bound: the summary lists them as
+open, and the user decides. A fix made past the bound still gets a fix review
+before it ships, and a lane round the user explicitly asks for past the bound
+takes the last lane-reviewed head as its base; the combo-log note logs either
+as outside the bound.
 
 Summarize: what shipped, who reviewed what, which findings were rejected and
-why.
+why, and which were deferred as outside the change (a PR description lists
+those too; see the `copilot-loop` skill).
 
 Then capture the run's tallies to the combo log, always: one
 `director emit --type note --area combo-log` with, per lane, submitted /
 accepted / rejected / unique-catch counts, plus builder facts (work orders,
-bounces, fix cycles) and any skips with their kind. The record shape lives in
+bounces, fix cycles), the valid findings the fix reviews raised, and any
+skips with their kind. The record shape lives in
 `ROSTER.md`. Future roster decisions run on this log; a run that skips it
 leaves no sample. If `director` is not on PATH, put the same record at the end
 of the summary instead, under a `combo-log` heading.

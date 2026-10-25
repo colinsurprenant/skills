@@ -244,6 +244,7 @@ echo
 echo "Wiring — symlinks into this clone"
 check_link "$HOME/.claude/skills/audit-directives" audit-directives
 check_link "$HOME/.claude/skills/delegate-build" delegate-build
+check_link "$HOME/.claude/skills/copilot-loop" copilot-loop
 check_link "$HOME/.claude/agents/delegate-builder.md" agents/delegate-builder.md
 check_link "$HOME/.claude/agents/claude-reviewer.md" agents/claude-reviewer.md
 check_link "$HOME/.claude/agents/researcher.md" agents/researcher.md
@@ -279,6 +280,7 @@ if [ "$codex_unused" = 1 ]; then
   row "delegate-build not installed for Codex" "$NO" "optional: bin/install --codex"; miss
 else
   check_link "$codex_skill" delegate-build "optional: delegate-build skill for Codex (bin/install --codex)"
+  check_link "$HOME/.agents/skills/copilot-loop" copilot-loop "optional: copilot-loop skill for Codex (bin/install --codex)"
 fi
 check_link "$HOME/.config/opencode/AGENTS.md" AGENT_BEHAVIOR.md "optional: OpenCode behavior file"
 check_link "$HOME/.copilot/copilot-instructions.md" AGENT_BEHAVIOR.md "optional: Copilot CLI behavior file"
