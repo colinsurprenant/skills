@@ -16,11 +16,11 @@
 # prints nothing. A plain run never creates the files or the ~/.agents links.
 # Under --codex (and so --all) a path in ~/.codex/agents that bin/roster-render
 # did not generate (no marker line), or that is a symlink, is an error left
-# alone, and so is a refused or failed ~/.agents/skills/delegate-build link:
-# then neither copilot-loop is linked nor any agent file rendered, and the run
-# exits non-zero. A refused copilot-loop link alone fails the run but does not
-# stop the render. copilot-loop's Claude Code link likewise waits on the
-# delegate-build link.
+# alone, and the run exits non-zero. A refused or failed
+# ~/.agents/skills/delegate-build link is one too, and then copilot-loop is not
+# linked and no agent file is rendered. A refused copilot-loop link alone fails
+# the run but does not stop the render. copilot-loop's Claude Code link
+# likewise waits on the Claude Code delegate-build link.
 # Before linking, removes links left by the delegate-build rename (opus-build,
 # opus-builder, opus-reviewer) that still name their old target in this clone.
 # Idempotent and non-clobbering:

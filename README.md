@@ -95,8 +95,9 @@ wrap, runs under Claude Code's own permission checks instead.
   was still named opus-build);
   [sandbox/](delegate-build/sandbox/) confines the headless review lanes.
 - **[copilot-loop/](copilot-loop/SKILL.md)**: the PR review loop with GitHub
-  Copilot, run to spend as few billed Copilot rounds as possible. A lane has
-  read every line of the head before the first review; each round is read
+  Copilot, run to spend as few billed Copilot rounds as possible. Where lanes
+  are available (Claude Code and Codex), a lane has read every line of the
+  head before the first review; each round is read
   whole (inline comments and the review body, where a finding on a file
   Copilot excludes, such as a `bin/` script, has shown up with no inline
   comment), fixed by class, and checked by a fix review on the no-cost lanes

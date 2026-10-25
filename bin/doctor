@@ -264,10 +264,11 @@ done
 [ "$stale" = 1 ] || { row "pre-rename links" "$OK" "none"; ok=$((ok+1)); }
 required=0
 check_link "$HOME/.codex/AGENTS.md" AGENT_BEHAVIOR.md "optional: Codex CLI behavior file"
-# delegate-build for Codex is the skill link plus the generated agent files. On
-# a machine with codex but neither (nothing at the link path, and no file
-# bin/roster-render generated in ~/.codex/agents), it was never installed, and
-# one row says so instead of a missing link and three missing files.
+# delegate-build for Codex is the skill link plus the generated agent files,
+# with the copilot-loop link beside it. On a machine with codex but none of
+# them (nothing at either link path, and no file bin/roster-render generated in
+# ~/.codex/agents), it was never installed, and one row says so instead of two
+# missing links and three missing files.
 # roster-render --codex --refresh --check prints nothing unless a generated file
 # is there, so any output at all means one is.
 codex_skill="$HOME/.agents/skills/delegate-build"

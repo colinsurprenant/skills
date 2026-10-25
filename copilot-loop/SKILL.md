@@ -34,10 +34,13 @@ severity your own triage gives it.
 
 ## What the user asked for
 
-- **Status only** ("has Copilot reviewed it?", "what did it say?"): read the
-  PR's state and the review (Each round, steps 1 and 3), report, and stop.
-- **One review**: request it (step 2), and report what it says when it
-  lands. Change nothing.
+- **Status only** ("has Copilot reviewed it?", "what did it say?"): take
+  Each round step 1's two listings, read any posted review (step 3), report
+  what is posted and whether a review is pending, and stop. Never wait or
+  request.
+- **One review**: take step 1's listings first. A pending review is waited
+  for (step 2's wait) and reported; otherwise request one (step 2) and report
+  it when it lands. Change nothing.
 - **The loop** (fix and re-request until done): everything below.
 
 ## Before the first review
@@ -52,7 +55,8 @@ severity your own triage gives it.
      last lane-reviewed head (Each round, step 5).
    Triage and fix what those lanes find exactly as in a Copilot round (Each
    round, steps 4 and 5). This preparation is a round of its own for step
-   5's budget, its first lane review included.
+   5's budget: at most three lane reviews in all, its first one (breadth
+   pass or fix review) included.
 2. **The PR description holds.** Copilot reads the title and description and
    flags code that contradicts them; no lane has seen them. Put the draft
    description in the last lane request and ask for every claim the code
@@ -68,32 +72,42 @@ severity your own triage gives it.
    `review_draft_pull_requests: true` also reviews draft PRs. GitHub's
    personal Copilot settings offer the same two options
    (https://docs.github.com/en/copilot/how-tos/use-copilot-agents/request-a-code-review/configure-automatic-review)
-   and no API reads them. If a rule has either on, or a Copilot review shows
-   up that nobody requested (step 1 sees it), the stop rule cannot hold:
-   tell the user and wait for their call before pushing. Never turn either
-   on. Automatic review when a PR opens is fine.
+   and no API reads them, so ask the user whether theirs are on, unless they
+   have already said (in this session or in standing instructions). If
+   either is on anywhere, or step 1 later finds a Copilot review on a push
+   that nobody requested (the automatic review when the PR opens does not
+   count), the stop rule cannot hold: tell the user and wait for their call
+   before pushing. This is an approval gate, so in Codex end the turn with
+   the question. Never turn either option on. Automatic review when a PR
+   opens is fine.
 
 ## Each round
 
-1. **Read the PR's state.** Count Copilot's reviews for the stop rule: `gh
-   api --paginate repos/<owner>/<repo>/pulls/<n>/reviews`, Copilot's
-   reviewer login being `copilot-pull-request-reviewer[bot]`. Then, in order:
-   - if Copilot is still a requested reviewer (`gh pr view <n> --json
-     reviewRequests`), a review is pending: wait for it as in step 2,
-     timed from now, instead of requesting another;
-   - else if the newest Copilot review has not been processed yet (an
-     automatic review on open, or one requested earlier), process it from
-     step 3;
-   - else apply the stop rule, and go to step 2 only if it allows a round.
-2. **Request and wait.** Note the time, request with `gh pr edit <n>
-   --add-reviewer @copilot` (gh 2.97+), and wait for a Copilot review
-   submitted after that time. It should be on the SHA you pushed; GitHub can
-   lag in syncing a push, so a review can land on the previous head instead.
-   Process such a review anyway (it is billed, and its findings may still
-   apply), and tell the user the pushed head is not yet reviewed. On this
-   repository's PR #25 (2026-10) each review landed within eight minutes of
-   its request; if none has landed after 20 minutes, stop and tell the user.
-3. **Read the whole review**: every inline comment AND the review body. The
+1. **Read the PR's state** with two listings. Reviews: `gh api --paginate
+   repos/<owner>/<repo>/pulls/<n>/reviews`, where Copilot's are by
+   `copilot-pull-request-reviewer[bot]`; count them for the stop rule and
+   keep the list. Pending requests: `gh api
+   repos/<owner>/<repo>/pulls/<n>/requested_reviewers`, where a requested
+   Copilot review shows as login `Copilot` until it posts. Then, in order:
+   - if a Copilot review is pending, wait for it (step 2's wait) instead of
+     requesting another;
+   - then process every Copilot review not processed yet, oldest first, as
+     one round from step 3 (an automatic review on open, or ones requested
+     earlier);
+   - with nothing pending or unprocessed, apply the stop rule, and go to
+     step 2 only if it allows a round.
+2. **Request and wait.** Request with `gh pr edit <n> --add-reviewer
+   @copilot` (gh 2.97+), then wait for a Copilot review that is not in step
+   1's list (re-list the reviews to check). It should be on the SHA you
+   pushed; GitHub can lag in syncing a push, so a review can land on the
+   previous head instead. Process such a review anyway (it is billed, and its
+   findings may still apply), and tell the user the pushed head is not yet
+   reviewed. On this repository's PR #25 (2026-10) each review landed within
+   eight minutes of its request; if none has landed after 20 minutes, stop
+   and tell the user.
+3. **Read the whole review**: every inline comment (`gh api --paginate
+   repos/<owner>/<repo>/pulls/<n>/comments`, those whose
+   `pull_request_review_id` is the review's id) AND the review body. The
    body lists the open issues with their severities, and under "Previously
    missed" any new findings on code that had not changed. GitHub's docs say
    files under its built-in exclusions (`**/bin/**/*` among them, with
@@ -113,9 +127,8 @@ severity your own triage gives it.
    instance the change neither touches nor affects is pre-existing: name it
    as a follow-up, not fixed.
 5. **Fix review before pushing.** Commit the fixes, then run every installed
-   no-cost lane on the fix range: base the last lane-reviewed head (the SHA
-   Copilot last reviewed, when no fix review has run since), head the fix
-   commit, with the merge base named for context. Each request carries the
+   no-cost lane on the fix range: base the last head a lane reviewed, head
+   the fix commit, with the merge base named for context. Each request carries the
    comments or findings the fixes address and asks for: a fixed / still-open
    verdict on each; defects in the code the fix wrote or changed, and in
    callers of what it changed; the same defect class elsewhere in the change;
@@ -147,9 +160,10 @@ When the loop ends (merge, stop rule, timeout, or the user's call), emit one
 `director emit --type note --area copilot-rounds` with `<repo>#<n>:
 rounds=<n> inline=<per-round counts, e.g. 3,1,0> body_only=<n> accepted=<n>
 rejected=<n> prepared=<delegate-build|breadth|fix-review|none>
-stop=<clean|bound|user|merged|timeout>`, where `rounds` counts every
-Copilot review the PR received, including one that landed on an older head
-or after the loop stopped. These notes are how the round count is measured
+stop=<clean|bound|user|merged|timeout> pending=<0|1>`, where `rounds`
+counts every Copilot review the PR had received when the loop ended, one
+that landed on an older head included, and `pending=1` says a requested
+review had not posted yet. These notes are how the round count is measured
 over time. In Codex the write goes through the escalation path `codex.md`
 gives for `director emit`. If `director` is not on PATH or the write is
 refused, put the same record at the end of your final message.

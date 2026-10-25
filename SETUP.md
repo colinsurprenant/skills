@@ -43,12 +43,15 @@ under an explicitly requested flag (`--codex`, `--opencode`, `--copilot`,
 `--all`) it exits non-zero as well. Otherwise the exit status is doctor's.
 
 `--codex` does more than link: besides the `AGENTS.md` link it links
-`delegate-build` and `copilot-loop` into `~/.agents/skills` and renders three Codex agent files
-(`delegate-builder.toml`, `scout.toml`, `researcher.toml`, pinned from the
-`CODEX_*` keys in `roster.conf`) into `~/.codex/agents` as regular files, since
-Codex refuses symlinked agent files. The delegate-build link is what marks the agent
-files as this clone's: if it is refused or cannot be created, `--codex` renders
-no agent files and exits non-zero. A plain `bin/install` only refreshes the
+`delegate-build` into `~/.agents/skills`, then `copilot-loop` beside it, and
+renders three Codex agent files (`delegate-builder.toml`, `scout.toml`,
+`researcher.toml`, pinned from the `CODEX_*` keys in `roster.conf`) into
+`~/.codex/agents` as regular files, since Codex refuses symlinked agent files.
+The delegate-build link is what marks the agent files as this clone's: if it
+is refused or cannot be created, `--codex` links no `copilot-loop`, renders no
+agent files and exits non-zero. The Claude Code `copilot-loop` link likewise
+waits on the Claude Code `delegate-build` link, since copilot-loop runs its
+lanes through delegate-build's mechanics. A plain `bin/install` only refreshes the
 agent files it generated earlier, and only when
 `~/.agents/skills/delegate-build` links into the clone it runs from. If
 generated files exist but that link is missing or points at another clone, it
@@ -90,10 +93,11 @@ yourself:
 Reports which tools are installed, which symlinks resolve into this clone, and
 which delegate-build review lanes are live. Run it again after any step below.
 Its optional Codex rows cover the `~/.agents/skills/delegate-build` and
-`~/.agents/skills/copilot-loop` links and each generated agent file, checked whole against `roster.conf` and the
-`agents/*.md` bodies (drift names `bin/install --codex` as the fix). With
-`codex` on PATH and neither of those links nor any generated file, they collapse to
-one row saying delegate-build is not installed for Codex; without `codex` on
+`~/.agents/skills/copilot-loop` links and each generated agent file, checked
+whole against `roster.conf` and the `agents/*.md` bodies (drift names
+`bin/install --codex` as the fix). With `codex` on PATH and neither of those
+links nor any generated file, they collapse to one row saying
+delegate-build is not installed for Codex; without `codex` on
 PATH, the link rows stay and the agent-file rows give way to one row saying
 Codex is not installed.
 `bin/doctor --deep` also sends one real prompt through the Kimi lane (so a
@@ -116,6 +120,9 @@ install exits 0.
     ln -s "$REPO/agents/researcher.md"        ~/.claude/agents/researcher.md
     ln -s "$REPO/agents/scout.md"             ~/.claude/agents/scout.md
     ln -s "$REPO/commands/iterate.md"         ~/.claude/commands/iterate.md
+
+Make the `copilot-loop` link only when the `delegate-build` link above points
+into this clone: copilot-loop runs its lanes through that skill's mechanics.
 
 If you already have a `~/.claude/CLAUDE.md`, the first link fails rather than
 clobbering it: fold your content into your fork of `CLAUDE.global.md`
@@ -164,6 +171,9 @@ you run it from; it never creates them). The manual equivalent:
     ln -s "$REPO/delegate-build" ~/.agents/skills/delegate-build
     ln -s "$REPO/copilot-loop"   ~/.agents/skills/copilot-loop
     "$REPO/bin/roster-render" --codex ~/.codex/agents
+
+As in the Claude Code set, make the `copilot-loop` link only when the
+`delegate-build` link points into this clone.
 
 `bin/roster-render --codex <dir> [--check] [--refresh]` renders into any
 directory you name, and `--claude <dir> [--check]` does the same for the four
