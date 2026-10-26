@@ -140,7 +140,8 @@ Every lane request, breadth pass and fix review alike, carries this method
 block verbatim, after the base, the head and what the review is for:
 
 > Method: start from the diff. List the changed files first (`git diff
-> --stat`) and cover each one, so a large file does not crowd out the rest.
+> --stat <base>...<head>`, over the range this request names) and cover
+> each one, so a large file does not crowd out the rest.
 > Go through every changed file and every hunk, in order. Do not skip a file
 > because it looks minor: docs, specs, skill files, scripts, `bin/`, config
 > and tests all count. For each hunk, ask what goes wrong when this code runs
@@ -169,8 +170,8 @@ then found on the same heads most of what it reported in round one without
 any lane having raised it (13 of 21 where the logs recorded the overlap). In
 a backtest on 12 of those PRs, one uncapped `gpt-6.1-sol` pass with this
 method, before the two additions below, caught 47% of Copilot's round-one
-findings, against 29% for a capped ranked pass. The `git diff --stat` line
-and the stale-facts clause were added after the backtest, aimed at its two
+findings, against 29% for a capped ranked pass. The file-list line and the
+stale-facts clause were added after the backtest, aimed at its two
 misses, and are untested. Sources:
 `notes/copilot-review-gap-2026-10.md`.
 
