@@ -136,17 +136,42 @@ lane only if the user opted in). The lane of this loop's own lineage is opt-in
 where the mechanics file offers a path to it, and otherwise skipped with kind
 `<lane>:own-lineage`. No fixes land between lanes.
 
-Every lane request, breadth pass and fix review alike, asks for every finding:
-no word cap, no top-N, no "most severe only". Bound the form, never the count:
-one entry per finding with file:line, severity (high, medium or low), the
-defect in one sentence and a concrete failure scenario. Ask the lane to go
-through every changed file and hunk, docs, specs, scripts, `bin/`, config and
-tests included; Copilot's PR review excludes `bin/` by default, so a lane is
-the only line-level reviewer that code gets. Why: in a 2026-10 sample of 45
-PRs, lanes asked for a capped, ranked report returned 1 to 9 findings each,
-and Copilot then found on the same heads most of what it reported in round
-one without any lane having raised it (13 of 21 where the logs recorded the
-overlap). Sources: `notes/copilot-review-gap-2026-10.md`.
+Every lane request, breadth pass and fix review alike, carries this method
+block verbatim, after the base, the head and what the review is for:
+
+> Method: start from the diff. List the changed files first (`git diff
+> --stat`) and cover each one, so a large file does not crowd out the rest.
+> Go through every changed file and every hunk, in order. Do not skip a file
+> because it looks minor: docs, specs, skill files, scripts, `bin/`, config
+> and tests all count. For each hunk, ask what goes wrong when this code runs
+> or this text is followed: wrong logic; an unhandled edge case or error
+> path; a security or trust-boundary gap; a concurrency or resource leak; a
+> broken contract with callers, with data formats, or with another part of
+> this same change; prose (docs, comments, specs, help text) that
+> contradicts the code or another part of the change, including counts,
+> dates, names and paths the change made stale. When a judgment depends on
+> code outside the diff, narrow with grep and glob, then read the exact
+> lines.
+> Record each finding as soon as you have evidence for it. Do not cap the
+> number of findings and do not drop one because others seem more important.
+> Bar: each finding is a concrete defect a maintainer would want fixed before
+> merge: a wrong behavior, a misleading contract or doc, a real risk. Not
+> style, naming or formatting preferences.
+> Report one entry per finding: file:line, severity (high, medium or low),
+> the defect in one sentence, a concrete failure scenario, and the file:line
+> you read that shows it.
+
+Add no word cap, top-N or "most severe only" to it: bound the form, never the
+count. Copilot's PR review excludes `bin/` by default, so a lane is the only
+line-level reviewer that code gets. Why: in a 2026-10 sample of 45 PRs, lanes
+asked for a capped, ranked report returned 1 to 9 findings each, and Copilot
+then found on the same heads most of what it reported in round one without
+any lane having raised it (13 of 21 where the logs recorded the overlap). In
+a backtest on 12 of those PRs, one uncapped `gpt-6.1-sol` pass with this
+method caught 47% of Copilot's round-one findings, against 29% for a capped
+ranked pass. The `git diff --stat` line and the stale-facts clause were added
+after the backtest, aimed at its two misses, and are untested. Sources:
+`notes/copilot-review-gap-2026-10.md`.
 
 Stakes decide whether this phase runs and whether to escalate to the expensive
 review the mechanics file names, if it names one, never which no-cost lanes
@@ -238,7 +263,7 @@ announce the base (the last lane-reviewed head) and the new head.
 Then the fix review: every installed no-cost lane (the Claude lane only if the
 user opted in) on the fix range, base to new head, with the merge base named
 for context. Each request carries the findings this cycle fixed, every
-lane's and not only its own, and asks, under Phase 4's output rules, for: a
+lane's and not only its own, carries Phase 4's method block, and asks for: a
 fixed / still-open verdict on each, since base and head alone cannot certify a
 closure or separate a regression from an unrelated new issue; defects in the
 code the fix wrote or changed, and in callers of what it changed; and the same

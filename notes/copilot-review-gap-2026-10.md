@@ -63,6 +63,38 @@ inconsistencies inside the change, stale references) were the other 26%.
 **Copilot was usually right.** 96% of adjudicated comments were accepted.
 Of the 10 rejected, 5 were outside the repository's threat model.
 
+## Backtest: which lane setup would have caught more (2026-10-25)
+
+12 of the sampled PRs (7 repositories) were replayed at the commit Copilot
+first reviewed, each checkout cut off from every later commit. Every setup
+was scored against Copilot's 48 round-one inline comments by one judge, who
+read the code at that commit; MATCH means the same root defect, specific
+enough that fixing it per the finding fixes Copilot's issue.
+
+| Setup | MATCH | Findings per PR | Input tokens |
+| --- | --- | --- | --- |
+| `gpt-6-astra` high, one pass, ranked, under 900 words (the lane as asked then) | 29% | 3.6 | 1x |
+| `gpt-6.1-sol` high, one uncapped pass with a Copilot-style method (mean of 3) | 47% | 6.4 | about 3.5x |
+| Three such passes merged | 52% | 9.2 | about 10.8x |
+| Three passes merged, low and medium findings kept on 2 of 3 votes | 50% | 6.0 | about 10.8x |
+
+- The merged passes caught 11 comments the capped pass missed, and the
+  capped pass caught none they missed; they did at least as well on all 12
+  PRs and better on 6.
+- The gain was in medium-severity behavior defects (12 of 22 against 5).
+  Prose-type comments (stale counts, comment drift) were caught by no setup
+  (at most 1 of 12), and on one PR every setup reviewed a large results file
+  and skipped the scripts beside it.
+- Of 20 sampled findings from the voted setup that matched no Copilot
+  comment, 16 were real defects, 4 debatable, none wrong.
+- The capped and uncapped setups differ in model, method and cap at once, so
+  the test cannot say which of the three matters most.
+
+That is why the GPT lane moved to one uncapped `gpt-6.1-sol` pass and every
+lane request carries the method (delegate-build Phase 4), rather than a
+three-pass ensemble: one pass gets about 90% of the ensemble's catches at a
+third of its cost.
+
 ## What Copilot runs (as of 2026-10)
 
 From the code review job logs of this repository's own reviews
