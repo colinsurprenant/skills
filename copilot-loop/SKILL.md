@@ -59,8 +59,7 @@ severity your own triage gives it.
    round, steps 4 and 5). This preparation is a round of its own for step
    5's budget: at most three lane reviews in all, its first one (breadth
    pass or fix review) included, and step 5's gate applies when the third
-   still leaves valid findings. Push the prepared head before the first
-   Copilot request, so Copilot reviews what the lanes read.
+   still leaves valid findings.
 2. **The PR description holds.** Copilot reads the title and description and
    flags code that contradicts them; no lane has seen them. Put the draft
    description in the last lane request and ask for every claim the code
@@ -81,25 +80,31 @@ severity your own triage gives it.
    author (normally the user) whether "Review new pushes" is on, unless they
    have already said (in this session or in standing instructions); the ask
    is an approval gate, so in Codex end the turn with the question. If
-   review on push is on anywhere, or step 1 later finds a Copilot review on a
+   review on push is on anywhere, or Each round step 1 later finds a review on a
    push that nobody requested (the automatic review when the PR opens does
    not count), the stop rule cannot hold: tell the user and wait for their
    call before pushing, again an approval gate. Never turn either option
    on. Automatic review when a PR opens is fine.
+5. **Push the prepared head last**, so Copilot's first review reads what the
+   lanes read: only after steps 1 to 4, and only once Each round step 1's
+   check finds the PR open with no Copilot review pending.
 
 ## Each round
 
 1. **Read the PR's state**: whether it is open (`gh pr view <n> --json
-   state`; merged or closed ends the loop), Copilot's posted reviews (`gh api
-   --paginate repos/<owner>/<repo>/pulls/<n>/reviews`, reviewer
-   `copilot-pull-request-reviewer[bot]`; their count feeds the stop rule),
-   and whether one is pending (`gh api
-   repos/<owner>/<repo>/pulls/<n>/requested_reviewers` lists Copilot under
-   `.users[]` as login `Copilot` until its review posts). These are separate
-   calls, and a review can post between them, so re-read all three right
-   before any decision that depends on them and after every wait, the
-   pending requests before the posted reviews (a review that posts in
-   between then shows up as posted rather than vanishing). The rules:
+   state`; merged or closed ends the loop), and its timeline (`gh api
+   --paginate repos/<owner>/<repo>/issues/<n>/timeline`). The timeline lists
+   in order each `review_requested` event whose `requested_reviewer.login`
+   is `Copilot` and each `reviewed` event by `Copilot`: a Copilot request
+   newer than Copilot's latest review means a review is pending, and the
+   `reviewed` events are the posted reviews, whose count feeds the stop rule.
+   Copilot does not show in `requested_reviewers` or `reviewRequests` while
+   its review is pending (checked on this repository's PR #26, 2026-10), so
+   do not look there. Read review bodies and ids from `gh api --paginate
+   repos/<owner>/<repo>/pulls/<n>/reviews` (reviewer
+   `copilot-pull-request-reviewer[bot]`). Re-read the state and the timeline
+   after every wait and right before any decision that depends on them. The
+   rules:
    - Never request a review while one is pending or a posted one has not
      been processed.
    - Process every posted review not processed yet together, as one round
@@ -109,9 +114,9 @@ severity your own triage gives it.
    - With nothing pending or unprocessed, apply the stop rule; it decides
      whether step 2 runs.
 2. **Request and wait.** Request with `gh pr edit <n> --add-reviewer
-   @copilot` (gh 2.97+), then wait until Copilot no longer shows as pending
-   (re-read the listings as step 1 says) and take the review that posted. It
-   should be on the SHA you pushed; GitHub can lag in
+   @copilot` (gh 2.97+), then wait until the timeline shows a Copilot review
+   newer than that request (re-read it as step 1 says) and take that review.
+   It should be on the SHA you pushed; GitHub can lag in
    syncing a push, so a review can land on the previous head instead.
    Process such a review anyway (it is billed, and its findings may still
    apply), and tell the user the pushed head is not yet reviewed. On this
