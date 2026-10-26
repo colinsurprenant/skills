@@ -168,8 +168,8 @@ asked for a capped, ranked report returned 1 to 9 findings each, and Copilot
 then found on the same heads most of what it reported in round one without
 any lane having raised it (13 of 21 where the logs recorded the overlap). In
 a backtest on 12 of those PRs, one uncapped `gpt-6.1-sol` pass with this
-method caught 47% of Copilot's round-one findings, against 29% for a capped
-ranked pass. The `git diff --stat` line and the stale-facts clause were added
+method, before the two additions below, caught 47% of Copilot's round-one
+findings, against 29% for a capped ranked pass. The `git diff --stat` line and the stale-facts clause were added
 after the backtest, aimed at its two misses, and are untested. Sources:
 `notes/copilot-review-gap-2026-10.md`.
 

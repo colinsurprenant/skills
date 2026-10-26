@@ -78,6 +78,9 @@ enough that fixing it per the finding fixes Copilot's issue.
 | Three such passes merged | 52% | 9.2 | about 10.8x |
 | Three passes merged, low and medium findings kept on 2 of 3 votes | 50% | 6.0 | about 10.8x |
 
+Input tokens are relative to the capped pass; the merged rows include the
+`gpt-6-astra` merge pass (about 0.2x) on top of three single passes.
+
 - The merged passes caught 11 comments the capped pass missed, and the
   capped pass caught none they missed; they did at least as well on all 12
   PRs and better on 6.
@@ -92,8 +95,8 @@ enough that fixing it per the finding fixes Copilot's issue.
 
 That is why the GPT lane moved to one uncapped `gpt-6.1-sol` pass and every
 lane request carries the method (delegate-build Phase 4), rather than a
-three-pass ensemble: one pass gets about 90% of the ensemble's catches at a
-third of its cost.
+three-pass ensemble: one pass gets about 90% of the ensemble's catches at
+about a third of its input tokens.
 
 ## What Copilot runs (as of 2026-10)
 
