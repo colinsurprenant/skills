@@ -158,7 +158,7 @@ link audit-directives            "$HOME/.claude/skills/audit-directives"
 if link delegate-build           "$HOME/.claude/skills/delegate-build"; then
   link copilot-loop              "$HOME/.claude/skills/copilot-loop"
 else
-  row "$HOME/.claude/skills/copilot-loop" "$NO" "not linked: it needs the delegate-build skill link above"
+  row "$HOME/.claude/skills/copilot-loop" "$NO" "not linked (required): it needs the delegate-build skill link above"
 fi
 render_agents
 link agents/delegate-builder.md  "$HOME/.claude/agents/delegate-builder.md"

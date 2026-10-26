@@ -51,8 +51,8 @@ The delegate-build link is what marks the agent files as this clone's: if it
 is refused or cannot be created, `--codex` links no `copilot-loop`, renders no
 agent files and exits non-zero. The Claude Code `copilot-loop` link likewise
 waits on the Claude Code `delegate-build` link, since copilot-loop runs its
-lanes through delegate-build's mechanics. A plain `bin/install` only refreshes the
-agent files it generated earlier, and only when
+lanes through delegate-build's mechanics. A plain `bin/install` only
+refreshes the agent files it generated earlier, and only when
 `~/.agents/skills/delegate-build` links into the clone it runs from. If
 generated files exist but that link is missing or points at another clone, it
 prints one "not refreshed" row, touches nothing and does not fail; if none
@@ -114,15 +114,18 @@ install exits 0.
     ln -s "$REPO/CLAUDE.global.md"            ~/.claude/CLAUDE.md
     ln -s "$REPO/audit-directives"            ~/.claude/skills/audit-directives
     ln -s "$REPO/delegate-build"              ~/.claude/skills/delegate-build
-    ln -s "$REPO/copilot-loop"                ~/.claude/skills/copilot-loop
     ln -s "$REPO/agents/delegate-builder.md"  ~/.claude/agents/delegate-builder.md
     ln -s "$REPO/agents/claude-reviewer.md"   ~/.claude/agents/claude-reviewer.md
     ln -s "$REPO/agents/researcher.md"        ~/.claude/agents/researcher.md
     ln -s "$REPO/agents/scout.md"             ~/.claude/agents/scout.md
     ln -s "$REPO/commands/iterate.md"         ~/.claude/commands/iterate.md
 
-Make the `copilot-loop` link only when the `delegate-build` link above points
-into this clone: copilot-loop runs its lanes through that skill's mechanics.
+Then link `copilot-loop`, which runs its lanes through delegate-build's
+mechanics, only beside a `delegate-build` link into this clone (the test
+makes the command a no-op otherwise):
+
+    [ "$(readlink ~/.claude/skills/delegate-build)" = "$REPO/delegate-build" ] &&
+      ln -s "$REPO/copilot-loop" ~/.claude/skills/copilot-loop
 
 If you already have a `~/.claude/CLAUDE.md`, the first link fails rather than
 clobbering it: fold your content into your fork of `CLAUDE.global.md`
@@ -168,12 +171,13 @@ earlier, and only when `~/.agents/skills/delegate-build` links into the clone
 you run it from; it never creates them). The manual equivalent:
 
     mkdir -p ~/.agents/skills
-    ln -s "$REPO/delegate-build" ~/.agents/skills/delegate-build
-    ln -s "$REPO/copilot-loop"   ~/.agents/skills/copilot-loop
-    "$REPO/bin/roster-render" --codex ~/.codex/agents
+    ln -s "$REPO/delegate-build" ~/.agents/skills/delegate-build &&
+      ln -s "$REPO/copilot-loop" ~/.agents/skills/copilot-loop &&
+      "$REPO/bin/roster-render" --codex ~/.codex/agents
 
-As in the Claude Code set, make the `copilot-loop` link only when the
-`delegate-build` link points into this clone.
+The `&&` chain stops at a refused `delegate-build` link, as `bin/install
+--codex` does; if that link already points into this clone, run the last two
+commands alone.
 
 `bin/roster-render --codex <dir> [--check] [--refresh]` renders into any
 directory you name, and `--claude <dir> [--check]` does the same for the four

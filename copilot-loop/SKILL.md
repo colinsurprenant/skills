@@ -1,6 +1,6 @@
 ---
 name: copilot-loop
-description: Run GitHub Copilot's PR review in as few billed rounds as possible. Make sure a review lane has read every line of the head Copilot first sees, read each Copilot review whole (inline comments and the overview body), fix each round by class, have the no-cost lanes review the fixes before the next request, and stop at a bound. Use when opening a PR that Copilot will review, or when the user asks to request, check, or handle a Copilot review, or to run the fix-and-re-request loop; a request only to check a review's status gets a report and changes nothing.
+description: Run GitHub Copilot's PR review in as few billed rounds as possible. Where review lanes are available, make sure one has read every line of the head Copilot first sees, read each Copilot review whole (inline comments and the overview body), fix each round by class, have the no-cost lanes review the fixes before the next request, and stop at a bound. Use when opening a PR that Copilot will review, or when the user asks to request, check, or handle a Copilot review, or to run the fix-and-re-request loop; a request only to check a review's status gets a report and changes nothing.
 ---
 
 # copilot-loop: fewer Copilot rounds per PR
@@ -39,8 +39,9 @@ severity your own triage gives it.
   what is posted and whether a review is pending, and stop. Never wait or
   request.
 - **One review**: take step 1's listings first. A pending review is waited
-  for (step 2's wait) and reported; otherwise request one (step 2) and report
-  it when it lands. Change nothing.
+  for (step 2's wait) and reported; a posted review nobody has processed yet
+  is reported; only with neither, request one (step 2) and report it when it
+  lands. Change nothing.
 - **The loop** (fix and re-request until done): everything below.
 
 ## Before the first review
@@ -69,31 +70,36 @@ severity your own triage gives it.
    `gh api --paginate repos/<owner>/<repo>/rules/branches/<branch>` lists
    them, repository and organization rulesets alike. A `copilot_code_review`
    rule with `review_on_push: true` bills a review on every push; one with
-   `review_draft_pull_requests: true` also reviews draft PRs. GitHub's
-   personal Copilot settings offer the same two options
+   `review_draft_pull_requests: true` only lets the one automatic review run
+   while the PR is a draft. GitHub's personal Copilot settings offer the same
+   two options
    (https://docs.github.com/en/copilot/how-tos/use-copilot-agents/request-a-code-review/configure-automatic-review)
-   and no API reads them, so ask the user whether theirs are on, unless they
-   have already said (in this session or in standing instructions). If
-   either is on anywhere, or step 1 later finds a Copilot review on a push
-   that nobody requested (the automatic review when the PR opens does not
-   count), the stop rule cannot hold: tell the user and wait for their call
-   before pushing. This is an approval gate, so in Codex end the turn with
-   the question. Never turn either option on. Automatic review when a PR
-   opens is fine.
+   and no API reads them; the ones that apply are the PR author's. Ask the
+   author (normally the user) whether "Review new pushes" is on, unless they
+   have already said (in this session or in standing instructions); the ask
+   is an approval gate, so in Codex end the turn with the question. If
+   review on push is on anywhere, or step 1 later finds a Copilot review on a
+   push that nobody requested (the automatic review when the PR opens does
+   not count), the stop rule cannot hold: tell the user and wait for their
+   call before pushing, again an approval gate. Never turn review on push
+   on. Automatic review when a PR opens is fine.
 
 ## Each round
 
-1. **Read the PR's state** with two listings. Reviews: `gh api --paginate
+1. **Read the PR's state.** First `gh pr view <n> --json state`: a merged or
+   closed PR ends the loop (Record, `stop=merged` or `stop=user`); check it
+   again after every wait. Then two listings. Reviews: `gh api --paginate
    repos/<owner>/<repo>/pulls/<n>/reviews`, where Copilot's are by
    `copilot-pull-request-reviewer[bot]`; count them for the stop rule and
    keep the list. Pending requests: `gh api
    repos/<owner>/<repo>/pulls/<n>/requested_reviewers`, where a requested
-   Copilot review shows as login `Copilot` until it posts. Then, in order:
-   - if a Copilot review is pending, wait for it (step 2's wait) instead of
-     requesting another;
-   - then process every Copilot review not processed yet, oldest first, as
+   Copilot review shows under `.users[]` as login `Copilot` until it posts.
+   Then, in order:
+   - process every posted Copilot review not processed yet, oldest first, as
      one round from step 3 (an automatic review on open, or ones requested
-     earlier);
+     earlier), so a stalled pending review never holds up posted findings;
+   - if a Copilot review is pending, wait for it (step 2's wait) and fold it
+     into the same round before any push, instead of requesting another;
    - with nothing pending or unprocessed, apply the stop rule, and go to
      step 2 only if it allows a round.
 2. **Request and wait.** Request with `gh pr edit <n> --add-reviewer
@@ -128,16 +134,19 @@ severity your own triage gives it.
    as a follow-up, not fixed.
 5. **Fix review before pushing.** Commit the fixes, then run every installed
    no-cost lane on the fix range: base the last head a lane reviewed, head
-   the fix commit, with the merge base named for context. Each request carries the
-   comments or findings the fixes address and asks for: a fixed / still-open
-   verdict on each; defects in the code the fix wrote or changed, and in
+   the fix commit, with the merge base named for context. Each request
+   carries the comments or findings the fixes address and asks for: a
+   fixed / still-open verdict on each; defects in the code the fix wrote or changed, and in
    callers of what it changed; the same defect class elsewhere in the change;
    and, if the description changed, claims the code contradicts. Fix what it
    finds valid, commit, and give that fix its own fix review, base the head
    the previous one read. At most three fix reviews per round. If the third
    still leaves valid findings, stop and ask the user whether to fix them
    (each such fix gets a fix review before it ships) or push as is; this is
-   an approval gate, so in Codex end the turn with the question.
+   an approval gate, so in Codex end the turn with the question. It waits,
+   where delegate-build's fix-cycle bound only announces, because it sits
+   before a billed push; delegate-build's ends a run with a summary and
+   pushes nothing.
 6. **Push once**, all of the round's fix commits together, then start the
    next round at step 1.
 
@@ -158,7 +167,8 @@ and that trade is the user's to change.
 
 When the loop ends (merge, stop rule, timeout, or the user's call), emit one
 `director emit --type note --area copilot-rounds` with `<repo>#<n>:
-rounds=<n> inline=<per-round counts, e.g. 3,1,0> body_only=<n> accepted=<n>
+rounds=<n> inline=<inline comments per Copilot review, oldest first, e.g.
+3,1,0> body_only=<n> accepted=<n>
 rejected=<n> prepared=<delegate-build|breadth|fix-review|none>
 stop=<clean|bound|user|merged|timeout> pending=<0|1>`, where `rounds`
 counts every Copilot review the PR had received when the loop ended, one

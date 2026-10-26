@@ -167,9 +167,9 @@ kind a fix review asks for (regressions, still-open findings, new defects in
 fix code, and the same defect class elsewhere in the change): one finding
 raised by two lanes in one fix review counts once, and the counts of the
 run's fix reviews add up, a fix review past the bound included (and named in
-`note=`). That is how the fix reviews show whether they earn their cost. A regression, a still-open
-accepted finding, or a new valid finding inside the change can each call for
-the next cycle, and several found on one fix review batch into it. Phase 3 fix
+`note=`). That is how the fix reviews show whether they earn their cost. A
+regression, a still-open accepted finding, or a new valid finding inside the
+change can each call for the next cycle, and several found on one fix review batch into it. Phase 3 fix
 orders issued before the breadth pass are not fix cycles; they count in
 `bounced`. A deferred follow-up, a rejected finding a fix review raised
 again, findings left open at the bound, and any fix or lane round past the

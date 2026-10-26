@@ -208,9 +208,10 @@ Copilot rounds).
 
 ## Phase 5 — Triage, fix, and fix review (here, on the main loop)
 
-The bound below protects one invariant: no line reaches the PR that no lane
-has read. Fix code is where later review rounds come from (2026-10 sample: on
-the PRs where it could be measured, 8 of 12 Copilot round-one comments sat on
+For a run whose Phase 4 ran, the bound below protects one invariant: no line
+reaches the PR that no lane has read (a run that took the Phase 4 skip, or
+had no lane, has no such guarantee, and its summary says so). Fix code is
+where later review rounds come from (2026-10 sample: on the PRs where it could be measured, 8 of 12 Copilot round-one comments sat on
 lines written by lane-driven fixes, and 28% of later-round comments landed on
 a line the previous round's fix changed, while a fix round changed a median
 7% of the PR's added lines), so every fix cycle ends in a fix review.
@@ -252,8 +253,9 @@ defect class elsewhere in the change. Adjudicate its output:
 
 At most three fix cycles, each followed by its fix review. Valid findings from
 the third fix review are not fixed within the bound: the summary lists them as
-open, for the user to decide on after the run. A fix made past the bound still gets a fix review
-before it ships, and a lane round the user explicitly asks for past the bound
+open, for the user to decide on after the run. A fix made past the bound
+still gets a fix review before it ships, and a lane round the user explicitly
+asks for past the bound
 takes the last lane-reviewed head as its base; the combo-log note logs either
 as outside the bound.
 

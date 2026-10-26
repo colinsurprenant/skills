@@ -81,12 +81,15 @@ including reviews a push triggers.
 - Lane requests ask for every finding, each with a severity, across every
   changed file (`bin/` included, which Copilot excludes by default).
 - Every fix cycle ends in a fix review on the lanes, at most three cycles,
-  so no line reaches the PR that no lane has read. Fixes are made by class,
-  and valid findings inside the change are fixed rather than deferred.
+  so when the lanes run, no line reaches the PR that no lane has read. Fixes
+  are made by class, and valid findings inside the change are fixed rather
+  than deferred, up to that bound; what is left at the bound goes to the
+  author as open.
 - Skipping lane review keys on what a change can break, never its size.
 - The copilot-loop skill runs the Copilot rounds themselves: where lanes are
-  available, a lane has read every line before the first review, each review is read whole, fixes get
-  a fix review before the next request, and a stop rule bounds the rounds.
+  available, a lane has read every line before the first review, each
+  review is read whole, fixes get a fix review before the next request, and
+  a stop rule bounds the rounds.
   Automatic review on every push stays off.
 
 The measure of success is fewer Copilot rounds per PR, which copilot-loop
