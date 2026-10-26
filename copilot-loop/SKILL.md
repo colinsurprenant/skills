@@ -23,9 +23,10 @@ pins and confinement, lives in the delegate-build skill's mechanics file for
 your harness: `~/.claude/skills/delegate-build/claude-code.md` in Claude
 Code, `~/.agents/skills/delegate-build/codex.md` in Codex, Phase 4 lane list.
 In any other harness there is no mechanics file: ask the user which lanes to
-run, or skip the lane steps and say so. Every lane request follows
-delegate-build's Phase 4 output rules: every finding, no word cap, one entry
-each with file:line, severity, defect and failure scenario. A lane reviews
+run, or skip the lane steps and say so. Every lane request carries
+delegate-build's Phase 4 method block verbatim: every finding, no word cap,
+one entry each with file:line, severity, defect, failure scenario and
+evidence. A lane reviews
 committed SHAs only, so commit before every lane review.
 
 **Severity.** Copilot's review body lists each open issue with a severity
