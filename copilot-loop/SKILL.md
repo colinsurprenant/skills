@@ -86,8 +86,11 @@ severity your own triage gives it.
    call before pushing, again an approval gate. Never turn either option
    on. Automatic review when a PR opens is fine.
 5. **Push the prepared head last**, so Copilot's first review reads what the
-   lanes read: only after steps 1 to 4, and only once Each round step 1's
-   check finds the PR open with no Copilot review pending.
+   lanes read, and only after steps 1 to 4. For a PR not opened yet, push
+   the branch and open the PR together at this point (`gh pr create` may do
+   the push), so an automatic review on open reads the prepared head. For an
+   existing PR, push only once Each round step 1 finds it open with no
+   Copilot review pending.
 
 ## Each round
 
@@ -95,9 +98,12 @@ severity your own triage gives it.
    state`; merged or closed ends the loop), and its timeline (`gh api
    --paginate repos/<owner>/<repo>/issues/<n>/timeline`). The timeline lists
    in order each `review_requested` event whose `requested_reviewer.login`
-   is `Copilot` and each `reviewed` event by `Copilot`: a Copilot request
-   newer than Copilot's latest review means a review is pending, and the
-   `reviewed` events are the posted reviews, whose count feeds the stop rule.
+   is `Copilot`, each `review_request_removed` for `Copilot`, and each
+   `reviewed` event by `Copilot`. A Copilot request newer than both
+   Copilot's latest review and any removal of that request means a review is
+   pending. The `reviewed` events are the posted reviews, whose count feeds
+   the stop rule; one with no Copilot request since the previous review,
+   other than the review when the PR opened, is a review nobody requested.
    Copilot does not show in `requested_reviewers` or `reviewRequests` while
    its review is pending (checked on this repository's PR #26, 2026-10), so
    do not look there. Read review bodies and ids from `gh api --paginate
@@ -114,8 +120,10 @@ severity your own triage gives it.
    - With nothing pending or unprocessed, apply the stop rule; it decides
      whether step 2 runs.
 2. **Request and wait.** Request with `gh pr edit <n> --add-reviewer
-   @copilot` (gh 2.97+), then wait until the timeline shows a Copilot review
-   newer than that request (re-read it as step 1 says) and take that review.
+   @copilot` (gh 2.97+) and confirm the timeline now shows that request; if
+   it does not, tell the user rather than wait. Then wait until the timeline
+   shows a Copilot review newer than the request (re-read it as step 1 says)
+   and take that review.
    It should be on the SHA you pushed; GitHub can lag in
    syncing a push, so a review can land on the previous head instead.
    Process such a review anyway (it is billed, and its findings may still
