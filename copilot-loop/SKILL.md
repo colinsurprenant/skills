@@ -40,7 +40,8 @@ severity your own triage gives it.
 - **One review**: a single review, without the loop's preparation (say so if
   no lane has read the head). Read the state first and follow step 1's
   rules: report any posted review nobody has processed yet, then wait for a
-  pending one; request (step 2) only when neither exists. Change nothing.
+  pending one (step 2's wait, with its timeout); request (step 2) only when
+  neither exists. The user's ask overrides the stop rule. Change nothing.
 - **The loop** (fix and re-request until done): everything below. The
   preparation below applies to the loop only.
 
@@ -57,7 +58,9 @@ severity your own triage gives it.
    Triage and fix what those lanes find exactly as in a Copilot round (Each
    round, steps 4 and 5). This preparation is a round of its own for step
    5's budget: at most three lane reviews in all, its first one (breadth
-   pass or fix review) included.
+   pass or fix review) included, and step 5's gate applies when the third
+   still leaves valid findings. Push the prepared head before the first
+   Copilot request, so Copilot reviews what the lanes read.
 2. **The PR description holds.** Copilot reads the title and description and
    flags code that contradicts them; no lane has seen them. Put the draft
    description in the last lane request and ask for every claim the code
@@ -92,9 +95,11 @@ severity your own triage gives it.
    `copilot-pull-request-reviewer[bot]`; their count feeds the stop rule),
    and whether one is pending (`gh api
    repos/<owner>/<repo>/pulls/<n>/requested_reviewers` lists Copilot under
-   `.users[]` as login `Copilot` until its review posts). The two listings
-   are separate calls, and a review can post between them, so re-read both
-   right before any decision that depends on them. The rules:
+   `.users[]` as login `Copilot` until its review posts). These are separate
+   calls, and a review can post between them, so re-read all three right
+   before any decision that depends on them and after every wait, the
+   pending requests before the posted reviews (a review that posts in
+   between then shows up as posted rather than vanishing). The rules:
    - Never request a review while one is pending or a posted one has not
      been processed.
    - Process every posted review not processed yet together, as one round
@@ -104,8 +109,9 @@ severity your own triage gives it.
    - With nothing pending or unprocessed, apply the stop rule; it decides
      whether step 2 runs.
 2. **Request and wait.** Request with `gh pr edit <n> --add-reviewer
-   @copilot` (gh 2.97+), then wait until a Copilot review posts that you had
-   not seen before. It should be on the SHA you pushed; GitHub can lag in
+   @copilot` (gh 2.97+), then wait until Copilot no longer shows as pending
+   (re-read the listings as step 1 says) and take the review that posted. It
+   should be on the SHA you pushed; GitHub can lag in
    syncing a push, so a review can land on the previous head instead.
    Process such a review anyway (it is billed, and its findings may still
    apply), and tell the user the pushed head is not yet reviewed. On this
