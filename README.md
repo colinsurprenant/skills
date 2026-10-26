@@ -103,8 +103,8 @@ wrap, runs under Claude Code's own permission checks instead.
   comment), fixed by class, and checked by a fix review on the no-cost lanes
   before the next request; a stop rule ends the loop. It reuses
   delegate-build's lanes and records each PR's round count to the Director
-  log. [notes/copilot-review-gap-2026-10.md](notes/copilot-review-gap-2026-10.md)
-  has the data behind it.
+  log. The data behind it is in
+  [notes/copilot-review-gap-2026-10.md](notes/copilot-review-gap-2026-10.md).
 - **[agents/delegate-builder.md](agents/delegate-builder.md)**,
   **[agents/claude-reviewer.md](agents/claude-reviewer.md)**,
   **[agents/researcher.md](agents/researcher.md)** and

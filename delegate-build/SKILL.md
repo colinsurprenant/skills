@@ -211,8 +211,9 @@ Copilot rounds).
 For a run whose Phase 4 ran, the bound below protects one invariant: no line
 reaches the PR that no lane has read (a run that took the Phase 4 skip, or
 had no lane, has no such guarantee, and its summary says so). Fix code is
-where later review rounds come from (2026-10 sample: on the PRs where it could be measured, 8 of 12 Copilot round-one comments sat on
-lines written by lane-driven fixes, and 28% of later-round comments landed on
+where later review rounds come from (2026-10 sample: on the PRs where it
+could be measured, 8 of 12 Copilot round-one comments sat on lines written by
+lane-driven fixes, and 28% of later-round comments landed on
 a line the previous round's fix changed, while a fix round changed a median
 7% of the PR's added lines), so every fix cycle ends in a fix review.
 
@@ -261,7 +262,8 @@ as outside the bound.
 
 Summarize: what shipped, who reviewed what, which findings were rejected and
 why, and which were deferred as outside the change (a PR description lists
-those too; see the `copilot-loop` skill).
+those too; see the `copilot-loop` skill). A run that skipped Phase 4 or had
+no lane says plainly that no lane read the change.
 
 Then capture the run's tallies to the combo log, always: one
 `director emit --type note --area combo-log` with, per lane, submitted /
