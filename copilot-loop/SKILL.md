@@ -83,19 +83,22 @@ closed PR ends the loop before any preparation.
    author (normally the user) whether "Review new pushes" is on, unless they
    have already said (in this session or in standing instructions); the ask
    is an approval gate, so in Codex end the turn with the question. If
-   review on push is on anywhere, or a Copilot review later posts that you
-   did not request (the automatic review when the PR opens, or when a draft
-   is marked ready, does not count), the stop rule cannot hold: tell the
-   user and wait for their
-   call before pushing, again an approval gate. Never turn either option
-   on. Automatic review when a PR opens is fine.
+   review on push is on anywhere, or a Copilot review later posts that no
+   request you know of accounts for (yours, an earlier session's, or the
+   user's; the automatic review when the PR opens, or when a draft is marked
+   ready, does not count), the stop rule cannot hold: tell the user and wait
+   for their call before pushing, again an approval gate. Never turn either
+   option on. Automatic review when a PR opens is fine.
 5. **Push the prepared head last**, so Copilot's first review reads what the
    lanes read, and only after steps 1 to 4. For a PR not opened yet, push
-   the branch (`git push -u origin <branch>`, so `gh pr create` has nothing
-   to prompt about), then open the PR right away, so an automatic review on
-   open reads the prepared head. For an existing PR, push once Each round
-   step 1 finds it open with no Copilot review pending; if one is pending,
-   wait for it (step 2's wait) and process it before pushing.
+   the branch to the remote the PR will come from (`git push -u <remote>
+   <branch>`, usually `origin`), then open it right away with the prepared
+   title and description (`gh pr create --title ... --body-file ...`), so
+   nothing prompts and an automatic review on open reads the prepared head.
+   If one is expected, give the timeline a minute to show it before Each
+   round step 1 decides to request. For an existing PR, push once Each
+   round step 1 finds it open with no Copilot review pending; if one is
+   pending, wait for it (step 2's wait) and process it before pushing.
 
 ## Each round
 
@@ -107,7 +110,9 @@ closed PR ends the loop before any preparation.
    assumed by analogy, not yet observed), and each `reviewed` event by
    `Copilot`. A Copilot request newer than both Copilot's latest review and
    any removal of that request means a review is pending. The `reviewed`
-   events are the posted reviews, whose count feeds the stop rule.
+   events are the posted reviews, whose count feeds the stop rule; a new one
+   that no request you know of accounts for triggers "Before the first
+   review" step 4's gate.
    Copilot does not show in `requested_reviewers` or `reviewRequests` while
    its review is pending (checked on this repository's PR #26, 2026-10), so
    do not look there. Read review bodies and ids from `gh api --paginate
@@ -199,8 +204,8 @@ stop=<clean|bound|user|merged|closed|timeout> pending=<0|1>`, where `rounds`
 counts every Copilot review the PR had received when the loop ended, one
 that landed on an older head included, and `pending=1` says step 1 found
 a review pending when the loop ended. These notes are how the round count
-is measured over time. In Codex the write goes through the escalation path `codex.md`
-gives for `director emit`. If `director` is not on PATH or the write is
+is measured over time. In Codex the write goes through the escalation path
+`codex.md` gives for `director emit`. If `director` is not on PATH or the write is
 refused, put the same record at the end of your final message.
 
 ## Repository setup (once per repo)
