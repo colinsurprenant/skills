@@ -116,8 +116,9 @@ One surface to edit, two to run, and `bin/install` to deliver the Codex copies:
   review lanes against what is actually installed, and prints the pins each
   lane will use. It also verifies the installed Codex agent files whole (a
   changed body or description is drift, not only a changed model or effort).
-  With `codex` on PATH and neither the skill link nor any generated file, it
-  prints one optional "delegate-build not installed for Codex" row instead.
+  With `codex` on PATH and none of the two skill links (delegate-build,
+  copilot-loop) nor any generated file, it prints one optional
+  "delegate-build not installed for Codex" row instead.
 
 Nothing parses `roster.conf` itself: `bin/roster-get` is the one reader every
 consumer goes through (`--file <path>` points it at another roster, for tests),
@@ -147,7 +148,7 @@ when a decision needs it).
 Emit one note per delegate-build run at Phase 5 close, and one for any notable
 singleton outcome (a bounced work order, a researcher spot-check result):
 
-    director emit --type note --area combo-log "<task>: build=<model> orders=<n> bounced=<n> fix_cycles=<n>; lane <name>: submitted=<n> accepted=<n> rejected=<n> unique=<n>; lane <name>: ...; skips=<lane:kind|none>; note=<one line>"
+    director emit --type note --area combo-log "<task>: build=<model> orders=<n> bounced=<n> fix_cycles=<n> fix_review=<n>; lane <name>: submitted=<n> accepted=<n> rejected=<n> unique=<n>; lane <name>: ...; skips=<lane:kind|none>; note=<one line>"
 
 `director` is a separate session-coordination CLI that is not part of this
 repo. The swap procedure's `director emit` step depends on it; without it,
@@ -157,17 +158,26 @@ Record facts (counts and one-line reasons), never derived metrics; metrics
 are recomputed at analysis time from the raw notes, so the record shape can
 stay stable while the questions change. Per-lane counts cover the Phase 4
 breadth pass only, so they describe one tree per lane; the note as a whole may
-span a confirming head. The Phase 5 confirming pass does not increment those
-counts: it increments `fix_cycles` instead, once per fix cycle actually run and
-not per finding. `fix_cycles` counts Phase 5 cycles only, 0 to 2: the triage
-fix dispatch after the breadth pass is the first, and the fix order that
-follows the confirming pass (reviewed in Phase 3, no further lane round) is
-the second and last. A regression, a still-open accepted finding, or a
-blocking new finding can each call for that second cycle, and several found on
-one pass batch into it. Phase 3 fix orders issued before the breadth pass are
-not fix cycles; they count in `bounced`. A deferred follow-up, and any lane
-round the user asks for past the bound, go in `note=`. This definition of
-`fix_cycles` changed 2026-09-28, so earlier records are not comparable on it.
+span later heads. Phase 5 fix reviews do not increment those counts.
+`fix_cycles` counts Phase 5 fix cycles actually run, 0 to 3, once per cycle
+and not per finding: the triage fix dispatch after the breadth pass is the
+first, and each fix review that leaves something to fix calls for the next.
+`fix_review` counts the distinct valid findings the fix reviews raised, every
+kind a fix review asks for (regressions, still-open findings, new defects in
+fix code, and the same defect class elsewhere in the change): one finding
+raised by two lanes in one fix review counts once, and the counts of the
+run's fix reviews add up, a fix review past the bound included (and named in
+`note=`). That is how the fix reviews show whether they earn their cost. A
+regression, a still-open accepted finding, or a new valid finding inside the
+change can each call for the next cycle, and several found on one fix review
+batch into it. Phase 3 fix orders issued before the breadth pass are not fix
+cycles; they count in
+`bounced`. A deferred follow-up, a rejected finding a fix review raised
+again, findings left open at the bound, and any fix or lane round past the
+bound go in `note=`. This definition of `fix_cycles`
+changed 2026-09-28 and again 2026-10-25 (fix reviews after every cycle
+replaced the single confirming pass), so earlier records are not comparable on
+it.
 `skips=` names each skipped lane with its kind: not installed, installed but
 down, `<lane>:own-lineage` for the orchestrator's own lineage where no
 opt-in path is offered (from a Codex main loop, `gpt:own-lineage`), or

@@ -88,11 +88,11 @@ the unread message pins its slot. A finished worker gets `followup_task`.
 not a report, so keep waiting until every spawned worker has delivered its
 final message. A worker that ends without one is a Phase 3 finding.
 
-SKILL.md's cycle-two "one narrow correction to the same builder" goes through
+SKILL.md Phase 5's "one narrow correction to the same builder" goes through
 `followup_task` to that worker's `task_name`. A follow-up to a finished worker
 needs a free slot, like a spawn: with every worker slot running, it fails with
 `agent thread limit reached` (observed on Codex 0.159.2). Keep a slot free
-between a cycle-two build and its correction, and on that error wait for a
+between a fix-cycle build and its correction, and on that error wait for a
 running worker to finish, then retry the follow-up.
 
 Codex spawns only when explicitly told to: this skill is that instruction, so
@@ -127,9 +127,9 @@ Workers already running keep going, and their reports wait for your next
 turn.
 
 Everything else SKILL.md asks for is an announcement, not a gate. Skipping
-Phase 4 (name what makes the change low-stakes), dropping an installed lane,
-and in Phase 5 deferring a new finding that is neither a regression nor
-blocking (deferred by default unless the user says otherwise) all follow
+Phase 4 (name the stakes axes you checked), dropping an installed lane, in
+Phase 5 deferring a finding that lies outside the change, and listing the
+findings left open at the fix-cycle bound in the summary all follow
 SKILL.md's own semantics: you announce, the user can veto, and you do not stop
 and wait. The announcement is mandatory before you proceed, every time; it is
 the user's chance to veto, and a veto in chat is honored.

@@ -3,7 +3,9 @@
 # default, the optional harness links by flag. Renders agents/*.md frontmatter
 # from roster.conf first, so the links land on current files.
 # --codex also links the delegate-build skill into ~/.agents/skills and renders
-# the delegate-builder, scout and researcher agent files into ~/.codex/agents.
+# the delegate-builder, scout and researcher agent files into ~/.codex/agents;
+# once that link is in place it links copilot-loop beside it, since
+# copilot-loop runs its lanes through delegate-build's mechanics.
 # Those are regular files, not links (Codex refuses a symlinked agent file), so
 # they do not follow a git pull by themselves. A plain run (no --codex)
 # refreshes the ones an earlier run generated, but only when
@@ -11,11 +13,14 @@
 # link is what says whose files they are. With generated files present and no
 # such link (missing, or pointing at another clone) it prints one "not
 # refreshed" row, touches nothing and does not fail; with no generated files it
-# prints nothing. A plain run never creates the files or the ~/.agents link.
+# prints nothing. A plain run never creates the files or the ~/.agents links.
 # Under --codex (and so --all) a path in ~/.codex/agents that bin/roster-render
 # did not generate (no marker line), or that is a symlink, is an error left
-# alone, and so is a refused or failed ~/.agents link: then no agent file is
-# rendered at all, and the run exits non-zero.
+# alone, and the run exits non-zero. A refused or failed
+# ~/.agents/skills/delegate-build link is one too, and then copilot-loop is not
+# linked and no agent file is rendered. A refused copilot-loop link alone fails
+# the run but does not stop the render. copilot-loop's Claude Code link
+# likewise waits on the Claude Code delegate-build link.
 # Before linking, removes links left by the delegate-build rename (opus-build,
 # opus-builder, opus-reviewer) that still name their old target in this clone.
 # Idempotent and non-clobbering:
@@ -148,7 +153,13 @@ echo "Claude Code (required set)"
 migrate_pre_rename
 link CLAUDE.global.md            "$HOME/.claude/CLAUDE.md"
 link audit-directives            "$HOME/.claude/skills/audit-directives"
-link delegate-build              "$HOME/.claude/skills/delegate-build"
+# copilot-loop runs its lanes through delegate-build's mechanics, so it is
+# linked only beside a delegate-build link into this clone.
+if link delegate-build           "$HOME/.claude/skills/delegate-build"; then
+  link copilot-loop              "$HOME/.claude/skills/copilot-loop"
+else
+  row "$HOME/.claude/skills/copilot-loop" "$NO" "not linked (required): it needs the delegate-build skill link above"
+fi
 render_agents
 link agents/delegate-builder.md  "$HOME/.claude/agents/delegate-builder.md"
 link agents/claude-reviewer.md   "$HOME/.claude/agents/claude-reviewer.md"
@@ -166,10 +177,12 @@ if [ "$do_codex" = 1 ]; then
   # The skill link is what marks the agent files as this clone's, so a refused
   # or failed one means no file is rendered: they would belong to no link.
   if link delegate-build "$codex_skill"; then
+    link copilot-loop "$HOME/.agents/skills/copilot-loop"
     c_out="$("$repo/bin/roster-render" --codex "$codex_dir" 2>&1)"; c_rc=$?
     codex_rows "$c_out" "$c_rc"
   else
     row "$codex_dir" "$NO" "agent files not rendered: the delegate-build skill link above is not in place"
+    row "$HOME/.agents/skills/copilot-loop" "$NO" "not linked: it needs the delegate-build skill link above"
   fi
   explicit=0
 else
