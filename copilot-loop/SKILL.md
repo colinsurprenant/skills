@@ -47,6 +47,9 @@ severity your own triage gives it.
 
 ## Before the first review
 
+For an existing PR, read its state first (Each round, step 1): a merged or
+closed PR ends the loop before any preparation.
+
 1. **A lane has read every line of the head.** A delegate-build run that ran
    Phase 4 and closed Phase 5 leaves the head that way; one that skipped
    Phase 4 or had no lane available does not. Otherwise:
@@ -80,17 +83,19 @@ severity your own triage gives it.
    author (normally the user) whether "Review new pushes" is on, unless they
    have already said (in this session or in standing instructions); the ask
    is an approval gate, so in Codex end the turn with the question. If
-   review on push is on anywhere, or Each round step 1 later finds a review on a
-   push that nobody requested (the automatic review when the PR opens does
-   not count), the stop rule cannot hold: tell the user and wait for their
+   review on push is on anywhere, or a Copilot review later posts that you
+   did not request (the automatic review when the PR opens, or when a draft
+   is marked ready, does not count), the stop rule cannot hold: tell the
+   user and wait for their
    call before pushing, again an approval gate. Never turn either option
    on. Automatic review when a PR opens is fine.
 5. **Push the prepared head last**, so Copilot's first review reads what the
    lanes read, and only after steps 1 to 4. For a PR not opened yet, push
-   the branch and open the PR together at this point (`gh pr create` may do
-   the push), so an automatic review on open reads the prepared head. For an
-   existing PR, push only once Each round step 1 finds it open with no
-   Copilot review pending.
+   the branch (`git push -u origin <branch>`, so `gh pr create` has nothing
+   to prompt about), then open the PR right away, so an automatic review on
+   open reads the prepared head. For an existing PR, push once Each round
+   step 1 finds it open with no Copilot review pending; if one is pending,
+   wait for it (step 2's wait) and process it before pushing.
 
 ## Each round
 
@@ -98,12 +103,11 @@ severity your own triage gives it.
    state`; merged or closed ends the loop), and its timeline (`gh api
    --paginate repos/<owner>/<repo>/issues/<n>/timeline`). The timeline lists
    in order each `review_requested` event whose `requested_reviewer.login`
-   is `Copilot`, each `review_request_removed` for `Copilot`, and each
-   `reviewed` event by `Copilot`. A Copilot request newer than both
-   Copilot's latest review and any removal of that request means a review is
-   pending. The `reviewed` events are the posted reviews, whose count feeds
-   the stop rule; one with no Copilot request since the previous review,
-   other than the review when the PR opened, is a review nobody requested.
+   is `Copilot`, each `review_request_removed` (same field; that shape is
+   assumed by analogy, not yet observed), and each `reviewed` event by
+   `Copilot`. A Copilot request newer than both Copilot's latest review and
+   any removal of that request means a review is pending. The `reviewed`
+   events are the posted reviews, whose count feeds the stop rule.
    Copilot does not show in `requested_reviewers` or `reviewRequests` while
    its review is pending (checked on this repository's PR #26, 2026-10), so
    do not look there. Read review bodies and ids from `gh api --paginate
@@ -120,12 +124,13 @@ severity your own triage gives it.
    - With nothing pending or unprocessed, apply the stop rule; it decides
      whether step 2 runs.
 2. **Request and wait.** Request with `gh pr edit <n> --add-reviewer
-   @copilot` (gh 2.97+) and confirm the timeline now shows that request; if
-   it does not, tell the user rather than wait. Then wait until the timeline
-   shows a Copilot review newer than the request (re-read it as step 1 says)
-   and take that review.
-   It should be on the SHA you pushed; GitHub can lag in
-   syncing a push, so a review can land on the previous head instead.
+   @copilot` (gh 2.97+) and confirm the timeline shows that request (events
+   can lag: re-read it for up to a minute); if it never appears, tell the
+   user rather than wait. Then wait until the timeline shows a Copilot review
+   newer than the request (re-read it as step 1 says) and take that review;
+   if the request is removed instead, stop waiting and tell the user. It
+   should be on the SHA you pushed; GitHub can lag in syncing a push, so a
+   review can land on the previous head instead.
    Process such a review anyway (it is billed, and its findings may still
    apply), and tell the user the pushed head is not yet reviewed. On this
    repository's PR #25 (2026-10) each review landed within eight minutes of
@@ -192,9 +197,9 @@ rounds=<n> inline=<inline comments per Copilot review, oldest first, e.g.
 rejected=<n> prepared=<delegate-build|breadth|fix-review|none>
 stop=<clean|bound|user|merged|closed|timeout> pending=<0|1>`, where `rounds`
 counts every Copilot review the PR had received when the loop ended, one
-that landed on an older head included, and `pending=1` says a requested
-review had not posted yet. These notes are how the round count is measured
-over time. In Codex the write goes through the escalation path `codex.md`
+that landed on an older head included, and `pending=1` says step 1 found
+a review pending when the loop ended. These notes are how the round count
+is measured over time. In Codex the write goes through the escalation path `codex.md`
 gives for `director emit`. If `director` is not on PATH or the write is
 refused, put the same record at the end of your final message.
 
