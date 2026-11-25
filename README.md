@@ -117,6 +117,9 @@ wrap, runs under Claude Code's own permission checks instead.
   for fuzzy-scope work (frame, build, evaluate, decide). Its premise: in
   discovery work the spec is an output, written at convergence rather than
   guessed up front.
+- **[bin/codex-broker-stop](bin/codex-broker-stop)**: stops the idle Codex
+  broker a GPT review lane leaves behind in a worktree (`--gone` for worktrees
+  already removed). It never stops one with a client connected.
 - **[bin/measure-session](bin/measure-session)**: reads a Claude Code session
   transcript and reports its list-price cost by model, main loop versus
   subagents (`cost`), or where the main loop's tokens went by phase (`phases`).
