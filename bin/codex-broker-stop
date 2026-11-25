@@ -1,28 +1,33 @@
 #!/usr/bin/env bash
-# Stop the Codex plugin's idle app-server brokers for the folders named, or for
-# folders that no longer exist.
+# Stop the Codex plugin's leftover app-server brokers for the folders named, or
+# for folders that no longer exist.
 #
 # Usage: bin/codex-broker-stop [--dry-run] <dir>...
 #        bin/codex-broker-stop [--dry-run] --gone
 #   <dir>...  stop the brokers started for these folders (a worktree a GPT lane
 #             ran in). --gone stops the brokers whose folder was deleted.
-#   Exit 0 when nothing is left to stop, 3 when a broker was left running (a
-#   client is connected, or its state could not be read), 2 on a usage error.
+#   Exit 0 when nothing is left to stop, 2 on a usage error, 3 when a broker was
+#   left running or the processes could not be inspected; the output says why.
 #
 # Why this exists: the codex plugin (1.0.6) starts one detached broker per
 # working folder, and its SessionEnd hook stops only the broker of the folder the
 # session ended in (session-lifecycle-hook.mjs). A lane run in a worktree leaves
 # its broker, app server and code-mode host up for good; on 2026-11-24 that was
-# 79 brokers, about 4 GB of summed RSS. Stopping one is safe when it is idle: the
-# next Codex run in that folder starts a new one (broker-lifecycle.mjs,
-# ensureBrokerSession).
+# 79 brokers, about 4 GB of summed RSS. The next Codex run in a folder whose
+# broker was stopped starts a new one (broker-lifecycle.mjs, ensureBrokerSession).
 #
-# An idle broker holds exactly 4 unix sockets: 3 to its app server and the
-# listener. A connected client is a fifth (checked on macOS by opening one). Any
-# other count means a client or an unreadable process, and is left alone.
+# A broker with no client holds exactly 4 unix sockets: 3 to its app server and
+# the listener. A connected client is a fifth (checked on macOS by opening one).
+# Any other count means a client or an unreadable process, and is left alone.
+# Two limits: a client can still connect between the count and the signal, and a
+# turn whose client died may still be running with no one to deliver its result
+# to; stopping the broker ends that turn.
+#
+# Only macOS is supported: the socket count and the ps fields were measured there.
 set -uo pipefail
 
 usage() { echo "usage: bin/codex-broker-stop [--dry-run] (<dir>... | --gone)" >&2; exit 2; }
+fail() { echo "codex-broker-stop: $1" >&2; exit 3; }
 
 dry=0; gone=0; dirs=()
 while [ "$#" -gt 0 ]; do
@@ -30,12 +35,13 @@ while [ "$#" -gt 0 ]; do
     --dry-run) dry=1; shift ;;
     --gone)    gone=1; shift ;;
     -*)        usage ;;
-    '')        usage ;;
+    ''|*$'\n'*) usage ;;
     *)         dirs+=("$1"); shift ;;
   esac
 done
 if [ "$gone" -eq 1 ]; then [ "${#dirs[@]}" -eq 0 ] || usage; else [ "${#dirs[@]}" -gt 0 ] || usage; fi
-command -v lsof >/dev/null || { echo "codex-broker-stop: lsof not found" >&2; exit 3; }
+[ "$(uname -s)" = Darwin ] || fail "only macOS is supported"
+command -v lsof >/dev/null || fail "lsof not found"
 
 # Every spelling of a folder the plugin may have passed as --cwd: as given,
 # physical, and its git toplevel (the plugin resolves the workspace root).
@@ -61,38 +67,72 @@ is_wanted() {
   printf '%s' "$wanted" | grep -Fxq -- "$1"
 }
 
+# Sets cwd and pidfile when the process is, right now, a broker of the plugin;
+# fails otherwise. The executable path is stripped using comm, which keeps its
+# spaces, so a shell or a `node -e` whose text merely quotes a broker command is
+# not one. The plugin generates the endpoint and pid-file values, so the first
+# --cwd and the last --pid-file are the real ones whatever the folder is called.
+broker_of() {
+  local comm cmd rest
+  comm="$(ps -ww -o comm= -p "$1" 2>/dev/null)" || return 1
+  cmd="$(ps -ww -o command= -p "$1" 2>/dev/null)" || return 1
+  [ "${comm##*/}" = node ] || return 1
+  rest="${cmd#"$comm" }"
+  case "$rest" in
+    /*/codex/*scripts/app-server-broker.mjs\ serve\ --endpoint\ *\ --cwd\ *\ --pid-file\ *) ;;
+    *) return 1 ;;
+  esac
+  pidfile="${rest##* --pid-file }"
+  cwd="${rest#* --cwd }"; cwd="${cwd% --pid-file *}"
+}
+
+# Prints the process's unix socket count; fails when lsof cannot read it.
+sockets() {
+  local out
+  out="$(lsof -nP -a -U -p "$1" 2>/dev/null)" || return 1
+  printf '%s\n' "$out" | awk 'NR>1 {n++} END {print n+0}'
+}
+
+# The plugin's record of a broker (broker.json) holds its pid, and a later
+# SessionEnd in that folder signals that pid's process group without checking
+# what it is (session-lifecycle-hook.mjs, process.mjs). Once the broker is gone
+# the pid can be reused, so its record goes too, matched by its pid file, which
+# is unique to one broker.
+forget() {
+  local f
+  for f in "${CLAUDE_PLUGIN_DATA:-/nonexistent}"/state/*/broker.json \
+           "$HOME"/.claude/plugins/data/codex-*/state/*/broker.json \
+           "${TMPDIR:-/tmp}"/codex-companion/*/broker.json; do
+    [ -f "$f" ] && grep -Fq "\"pidFile\": \"$1\"" "$f" || continue
+    rm -f -- "$f" || echo "state record not removed: $f"
+  done
+}
+
 left=0; seen=0
-# pid, then the command; a broker's command carries its folder between --cwd and
-# --pid-file.
-while read -r pid cmd; do
-  # The process itself must be node running the broker script: a shell whose text
-  # merely quotes a broker command line is not one.
-  first="${cmd%% *}"; rest="${cmd#* }"; script="${rest%% *}"
-  [ "${first##*/}" = node ] && [ "${script##*/}" = app-server-broker.mjs ] || continue
-  case "$rest" in *" serve "*" --cwd "*" --pid-file "*) ;; *) continue ;; esac
-  cwd="${cmd#* --cwd }"; cwd="${cwd%% --pid-file *}"
+keep() { echo "left running: $1"; left=$((left+1)); }
+
+all="$(ps -axww -o pid=,command=)" || fail "ps failed, so brokers could not be listed"
+pids="$(printf '%s\n' "$all" | awk '/app-server-broker\.mjs serve / {print $1}')"
+for pid in $pids; do
+  broker_of "$pid" || continue
   is_wanted "$cwd" || continue
   seen=$((seen+1))
-  n="$(lsof -nP -a -U -p "$pid" 2>/dev/null | awk 'NR>1' | wc -l | tr -d ' ')"
-  if [ "$n" != 4 ]; then
-    echo "left running: $pid ($n unix sockets, not 4: a client is connected, or unreadable) $cwd"
-    left=$((left+1)); continue
-  fi
+  if ! n="$(sockets "$pid")"; then keep "$pid (lsof could not read it) $cwd"; continue; fi
+  if [ "$n" != 4 ]; then keep "$pid ($n unix sockets, not 4: a client is connected) $cwd"; continue; fi
   if [ "$dry" -eq 1 ]; then echo "would stop: $pid $cwd"; continue; fi
   if ! kill -TERM "$pid" 2>/dev/null; then
-    kill -0 "$pid" 2>/dev/null && { echo "left running: $pid (could not signal) $cwd"; left=$((left+1)); }
+    if ps -p "$pid" >/dev/null 2>&1; then keep "$pid (could not signal) $cwd"; else forget "$pidfile"; fi
     continue
   fi
   i=0
   while kill -0 "$pid" 2>/dev/null && [ "$i" -lt 50 ]; do sleep 0.1; i=$((i+1)); done
   if kill -0 "$pid" 2>/dev/null; then
-    echo "left running: $pid (still up 5 s after the stop request) $cwd"; left=$((left+1))
+    keep "$pid (still up 5 s after the stop request) $cwd"
   else
+    forget "$pidfile"
     echo "stopped: $pid $cwd"
   fi
-done <<EOF
-$(ps -axww -o pid=,command= | grep '[a]pp-server-broker\.mjs serve ')
-EOF
+done
 
 [ "$seen" -gt 0 ] || echo "no broker found"
 [ "$left" -eq 0 ] || exit 3

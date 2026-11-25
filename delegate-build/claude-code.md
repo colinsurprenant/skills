@@ -94,9 +94,10 @@ is the `claude-reviewer` agent.
   After the lane's result is in, when it ran in a worktree, stop the broker it
   left there: `"$(cd -P ~/.claude/skills/delegate-build/.. && pwd)/bin/codex-broker-stop" <worktree>`.
   The plugin (v1.0.6) stops only the broker of the folder the session ends in,
-  so a worktree's broker otherwise stays up for good. The script refuses while a
-  client is connected (exit 3: leave it, a lane is still running there). Run it
-  before removing a worktree too; `--gone` cleans up after removed ones.
+  so a worktree's broker otherwise stays up for good. Exit 3 means a broker was
+  left running or could not be inspected, and the output says why: "a client is
+  connected" is a lane still running there, so leave it; report anything else.
+  Run it before removing a worktree too; `--gone` cleans up after removed ones.
 - **Kimi (via OpenCode)**: via Bash with `run_in_background` (or a long
   explicit timeout),
   `~/.claude/skills/delegate-build/sandbox/kimi-review.sh "<review prompt naming
