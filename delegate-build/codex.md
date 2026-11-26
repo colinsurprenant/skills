@@ -68,13 +68,12 @@ spawn unloads the longest-idle finished, errored or interrupted worker, even
 one with an unread `send_message`. A later `followup_task` reloads an
 unloaded worker, interrupted ones included, and it reads the kept mail on
 that turn (Codex 0.172.0: measured live for finished workers, read in the
-source for interrupted ones; on 0.159.2 unread mail pinned the slot). If the
-follow-up fails, give the remaining work to a new order. Codex's default
-limit is 4 agents including this main loop, so at most 3 workers loaded,
-running or finished; Codex's own prompt states the count, and if it differs,
-follow it. Independent orders spawn in the same turn, up to that limit. On an
-agent-limit error (`agent thread limit reached`), wait for a running worker's
-final message, then retry.
+source for interrupted ones; on 0.159.2 unread mail pinned the slot). Codex's
+default limit is 4 agents including this main loop, so at most 3 workers
+loaded, running or finished; Codex's own prompt states the count, and if it
+differs, follow it. Independent orders spawn in the same turn, up to that
+limit. On an agent-limit error (`agent thread limit reached`), wait for a
+running worker's final message, then retry.
 
 `send_message` only queues: a worker reads it at its next model call, so one
 that has already written its final answer reads it only when a
