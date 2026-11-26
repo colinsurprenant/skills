@@ -7,8 +7,8 @@
 #   <dir>...  stop the brokers started for these folders (a worktree a GPT lane
 #             ran in). --gone stops the brokers whose folder was deleted.
 #   Exit 0 when nothing is left to stop, 2 on a usage error, 3 when a broker or
-#   its state record was left, or processes could not be inspected; the output
-#   says why.
+#   its state record was left, or processes or a named folder could not be
+#   inspected; the output says why.
 #
 # Why this exists: the codex plugin (1.0.6) starts one detached broker per
 # working folder, and its SessionEnd hook stops only the broker of the folder the
