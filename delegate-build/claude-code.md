@@ -92,7 +92,7 @@ is the `claude-reviewer` agent.
   your final message." After a plugin update, re-check the sandbox defaults; a
   change is a roster-level change to surface to the user.
   After the lane's result is in, when it ran in a worktree, stop the broker it
-  left there: `"$(cd -P ~/.claude/skills/delegate-build/.. && pwd)/bin/codex-broker-stop" <worktree>`.
+  left there: `"$(cd -P ~/.claude/skills/delegate-build/.. && pwd)/bin/codex-broker-stop" "<worktree>"`.
   The plugin (v1.0.6) stops only the broker of the folder the session ends in,
   so a worktree's broker otherwise stays up for good. Exit 3 means something was
   left or could not be inspected, and the output says what: "a client is

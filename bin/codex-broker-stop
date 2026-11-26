@@ -57,10 +57,18 @@ if [ "$gone" -eq 0 ]; then
   done
 fi
 
-# A failed check is not an absence: these two need the system to say so.
+# A failed check is not an absence: these need the system to say so.
 no_process() { case "$(export LC_ALL=C; kill -0 "$1" 2>&1)" in *"No such process"*) return 0 ;; esac; return 1; }
-no_folder() { case "$(LC_ALL=C stat "$1" 2>&1)" in *"No such file or directory"*) return 0 ;; esac; return 1; }
+# 0 when the folder is gone, 1 when it exists, 2 when stat cannot tell. stat's
+# own error text ends its message, so a folder name cannot supply it.
+no_folder() {
+  local out
+  if out="$(LC_ALL=C stat "$1" 2>&1)"; then return 1; fi
+  case "$out" in *": No such file or directory") return 0 ;; esac
+  return 2
+}
 
+# 0 when the broker's folder is a target, 1 when not, 2 when that cannot be told.
 is_wanted() {
   local w
   if [ "$gone" -eq 1 ]; then no_folder "$1"; return; fi
@@ -123,11 +131,13 @@ left=0; seen=0
 keep() { echo "left running: $1"; left=$((left+1)); }
 
 all="$(ps -axww -o pid=,command=)" || fail "ps failed, so brokers could not be listed"
-pids="$(printf '%s\n' "$all" | awk '/app-server-broker\.mjs serve / {print $1}')"
+pids="$(printf '%s\n' "$all" | awk '/app-server-broker\.mjs serve / {print $1}')" ||
+  fail "awk failed, so brokers could not be listed"
 for pid in $pids; do
   broker_of "$pid"
   case $? in 0) ;; 2) keep "$pid (ps could not read it)"; continue ;; *) continue ;; esac
-  is_wanted "$cwd" || continue
+  is_wanted "$cwd"
+  case $? in 0) ;; 2) keep "$pid (could not tell whether its folder exists) $cwd"; continue ;; *) continue ;; esac
   seen=$((seen+1)); first="$pidfile"
   if ! n="$(sockets "$pid")"; then keep "$pid (lsof could not read it) $cwd"; continue; fi
   if [ "$n" -gt 4 ]; then keep "$pid (a client is connected: $n unix sockets, not 4) $cwd"; continue; fi
