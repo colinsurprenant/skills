@@ -60,33 +60,27 @@ no_folder() {
   return 2
 }
 
-# An absolute path without empty, "." or ".." components, resolved by text
-# alone: a deleted folder has no physical path left to ask for.
-lexical() {
-  local rest="${1#/}" part out=() joined
+# The as-given spelling without empty or "." components. ".." stays as given:
+# undoing it by text names another folder when a symlink comes before it.
+tidy() {
+  local rest="${1#/}" part out=""
   while [ -n "$rest" ]; do
     part="${rest%%/*}"
     case "$rest" in */*) rest="${rest#*/}" ;; *) rest="" ;; esac
-    case "$part" in
-      ''|.) ;;
-      ..) [ "${#out[@]}" -eq 0 ] || out=("${out[@]:0:${#out[@]}-1}") ;;
-      *) out+=("$part") ;;
-    esac
+    case "$part" in ''|.) ;; *) out="$out/$part" ;; esac
   done
-  [ "${#out[@]}" -gt 0 ] || { echo /; return; }
-  joined="$(IFS=/; echo "${out[*]}")"
-  echo "/$joined"
+  printf '%s\n' "${out:-/}"
 }
 
-# Every spelling of a folder the plugin may have passed as --cwd: as given (by
-# text), physical, and its git toplevel (the plugin resolves the workspace
+# Every spelling of a folder the plugin may have passed as --cwd: as given
+# (tidied), physical, and its git toplevel (the plugin resolves the workspace
 # root). A folder that exists but cannot be resolved is exit 3, not a silent
 # miss.
 wanted=()
 if [ "$gone" -eq 0 ]; then
   for d in "${dirs[@]}"; do
     case "$d" in /*) ;; *) d="$PWD/$d" ;; esac
-    wanted+=("$(lexical "$d")")
+    wanted+=("$(tidy "$d")")
     no_folder "$d"
     case $? in 0) continue ;; 2) echo "could not resolve folder: $d"; left=$((left+1)); continue ;; esac
     if p="$(CDPATH='' cd -P -- "$d" 2>/dev/null && pwd -P)"; then wanted+=("$p")
