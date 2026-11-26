@@ -1,5 +1,5 @@
 {
-  "commit": "60c68d145a14127ce633e26aa5fdfb882a7baa6d",
+  "commit": "6f0514052a3c859894ad01bb14cc14dda1e44b96",
   "files": [
     {
       "bytes": 300,
@@ -8,28 +8,28 @@
       "sha256": "0ae1276d0af9abb456a0f96409b32beb1b081227db7a3d0f236f919e4fd29bac"
     },
     {
-      "bytes": 3825,
+      "bytes": 4104,
       "file": "gpt-astra.txt",
       "path": "packages/core/src/plugin/system-prompt/gpt-astra.txt",
-      "sha256": "bbb87472e9f6e7960819e9e4af6bd0aed10db8fdc219c2e93820df8066cd5da3"
+      "sha256": "5322d77edfccb18ee02bd4b81ecd8c6e9d8c2ebc42ee976f77f4d6cfb7000f58"
     },
     {
-      "bytes": 2572,
+      "bytes": 2851,
       "file": "gpt.txt",
       "path": "packages/core/src/plugin/system-prompt/gpt.txt",
-      "sha256": "82d48b175f4ed1a2924d4adbeea3b51be7ecf25b1b0819467f9590d778af75bb"
+      "sha256": "9e5d6551682322b98017a9b069b243cf37d5db4c5fc5be7a874d6f4f36ba7528"
     },
     {
-      "bytes": 8701,
+      "bytes": 8978,
       "file": "kimi.txt",
       "path": "packages/core/src/plugin/system-prompt/kimi.txt",
-      "sha256": "a336c5d8a6f407dc5a1a030c06cfcc89458cf11c784cc7de91370e21a3b9133c"
+      "sha256": "15ef7ade0ae745a69ebe9c1862c5095b8784e51726dc93f8345f6aba56b21191"
     },
     {
-      "bytes": 7853,
+      "bytes": 8132,
       "file": "meta.txt",
       "path": "packages/core/src/plugin/system-prompt/meta.txt",
-      "sha256": "5e50dacb87875d8d55d134e64e2651d73de2c2934965761f2b83fe03c83c63df"
+      "sha256": "c415d37307c446f486fd8de7289158387344d42e2158e28aa5d6d31be7690c15"
     },
     {
       "bytes": 1332,
@@ -38,19 +38,19 @@
       "sha256": "88f088f1bfa0b5e7dabfb6d3083c19d4203f7e12cc00a251494264a5b243f1dd"
     },
     {
-      "bytes": 756,
+      "bytes": 1035,
       "file": "system.txt",
       "path": "packages/core/src/session/runner/prompt/system.txt",
-      "sha256": "ab9749036fe5a6b96c74c302900f67a9b249589b4fc4b8a8d18f3c6879dc506d"
+      "sha256": "ea6fc452d3c2e499b357aa6dac18b3db050a8c5336c01922bd7036f582f7134c"
     },
     {
-      "bytes": 7684,
+      "bytes": 7961,
       "file": "trinity.txt",
       "path": "packages/core/src/plugin/system-prompt/trinity.txt",
-      "sha256": "3a4162add9646e2ee314296e4c7d5bee604ffd85fb5197d9f86a8889c8f3119e"
+      "sha256": "01532f3e128241303602c7a3b1d5830b07e18daaf46bb71e5fb952c5a6cd7e53"
     }
   ],
-  "ref": "v2.1.0",
+  "ref": "v2.4.1",
   "repo": "anomalyco/opencode",
-  "version": "2.1.0"
+  "version": "2.4.1"
 }

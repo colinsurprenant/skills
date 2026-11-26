@@ -64,25 +64,26 @@ no-general-purpose rule.
 
 The multi-agent tools are `spawn_agent`, `send_message`, `followup_task`,
 `wait_agent`, `interrupt_agent` and `list_agents`. There is no close tool: a
-spawn unloads the longest-idle finished, errored or interrupted worker, but
-only one with no unread message. A worker that got a `send_message` after its
-last model call keeps its slot until a turn starts on it (verified on Codex
-0.159.2). Codex's default limit is 4 agents including this main loop, so at
-most 3 workers loaded, running or finished; Codex's own prompt states the
-count, and if it differs, follow it. Independent orders spawn in the same
-turn, up to that limit. On an agent-limit error (`agent thread limit
-reached`), wait for a running worker's final message, then retry. If none is
-running, a finished worker is pinned by unread mail: send it a
-`followup_task` asking only for its final report, wait, then retry.
+spawn unloads the longest-idle finished, errored or interrupted worker, even
+one with an unread `send_message`, which it keeps and reads when a later
+`followup_task` starts a turn on it (verified on Codex 0.172.0; on 0.159.2
+unread mail pinned the slot). Codex's default limit is 4 agents including
+this main loop, so at most 3 workers loaded, running or finished; Codex's own
+prompt states the count, and if it differs, follow it. Independent orders
+spawn in the same turn, up to that limit. On an agent-limit error (`agent
+thread limit reached`), wait for a running worker's final message, then
+retry.
 
-`send_message` only queues: a worker reads it at its next model call, or
-never if it has already written its final answer. Orders are self-contained,
+`send_message` only queues: a worker reads it at its next model call, so one
+that has already written its final answer reads it only when a
+`followup_task` starts a turn on it. Orders are self-contained,
 so use it only to relay a user decision that changes a running order, to
 answer a worker's own question, or to correct a running order that new
 evidence has invalidated (say what changed, add no scope). Never poll with
 it (`wait_agent` is the status call), never hand a researcher your hypothesis
 (a validator judges independently), and never message a finished worker:
-the unread message pins its slot. A finished worker gets `followup_task`.
+it sits unread until a `followup_task`. A finished worker gets
+`followup_task`.
 
 `wait_agent` returns on the FIRST finisher and also on timeout: a timeout is
 not a report, so keep waiting until every spawned worker has delivered its
@@ -91,7 +92,7 @@ final message. A worker that ends without one is a Phase 3 finding.
 SKILL.md Phase 5's "one narrow correction to the same builder" goes through
 `followup_task` to that worker's `task_name`. A follow-up to a finished worker
 needs a free slot, like a spawn: with every worker slot running, it fails with
-`agent thread limit reached` (observed on Codex 0.159.2). Keep a slot free
+`agent thread limit reached` (observed on Codex 0.159.2 and 0.172.0). Keep a slot free
 between a fix-cycle build and its correction, and on that error wait for a
 running worker to finish, then retry the follow-up.
 
@@ -162,7 +163,9 @@ These need escalation:
   re-confines itself under srt.
 - Every git write (add, commit, branch, `worktree add`), because
   workspace-write keeps each writable root's `.git` read-only unless `.git`
-  itself is a configured writable root.
+  itself is a configured writable root. In a linked worktree, git writes also
+  need the worktree's own gitdir, `<repo>/.git/worktrees/<name>`, as a
+  writable root beside `<repo>/.git` (measured on Codex 0.159.2 and 0.172.0).
 - `director emit` for the combo log, unless the Director hub (`~/.director`
   by default) is among the writable roots your permissions text lists. A
   launch-line `-c sandbox_workspace_write.writable_roots=[...]` replaces
@@ -170,8 +173,11 @@ These need escalation:
   matches a prefix rule. If the hub is missing, say so once at activation (a
   relaunch with the hub in that list avoids it), then escalate every emit.
 
-Workers: their shell commands have no network, but cached web search works in
-workers, so a research order can still read the web. A worker may request
+Workers: they inherit the main loop's whole sandbox policy, network included,
+so their shell commands have no network unless the main loop was launched
+with it (`-c sandbox_workspace_write.network_access=true`; measured on Codex
+0.172.0). Cached web search works in workers, so a research order can still
+read the web. A worker may request
 escalation itself (network, a write outside the sandbox); the prompt reaches
 the user through Codex's approval UI, or the auto-reviewer, labeled by worker.
 An order therefore names any escalation it expects up front, tells the worker

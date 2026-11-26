@@ -186,7 +186,7 @@ verify a directory without writing. A symlink at a target path, or a file the
 renderer did not generate, is an error in a write and in `--check`, and is
 skipped silently under `--refresh`, which only touches files it generated
 (that is what plain `bin/install` runs). The agent file format was verified
-against Codex CLI 0.159.2.
+against Codex CLI 0.172.0.
 
 Start the main loop with `codex --sandbox workspace-write --ask-for-approval
 on-request` and invoke the skill as `$delegate-build`. The main loop must be

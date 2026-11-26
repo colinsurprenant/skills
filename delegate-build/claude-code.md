@@ -81,7 +81,11 @@ is the `claude-reviewer` agent.
   `codex-companion.mjs task` (verified in the plugin's `agents/codex-rescue.md`
   and `commands/rescue.md`; unset, the lane tracks `~/.codex/config.toml`).
   Sandbox: the plugin dispatches with `sandbox: "read-only"` +
-  `approvalPolicy: "never"` by default (codex.mjs, plugin v1.0.6), OS-enforced
+  `approvalPolicy: "never"` by default (codex.mjs, plugin v1.0.6), but the
+  rescue agent adds `--write`, which runs workspace-write, unless the request
+  is read-only or review-only (`agents/codex-rescue.md`,
+  `codex-companion.mjs`), so the review-only framing above is what keeps the
+  lane read-only. The read-only sandbox is OS-enforced
   via Seatbelt but not absolute: Codex runs rule-approved commands OUTSIDE the
   sandbox, so a `~/.codex/rules` allowlist entry punches through (seen with
   `director emit`). Director is a separate coordination CLI; without it the
