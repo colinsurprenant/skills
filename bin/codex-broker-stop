@@ -44,21 +44,13 @@ if [ "$gone" -eq 1 ]; then [ "${#dirs[@]}" -eq 0 ] || usage; else [ "${#dirs[@]}
 [ "$(uname -s)" = Darwin ] || fail "only macOS is supported"
 command -v lsof >/dev/null || fail "lsof not found"
 
-# Every spelling of a folder the plugin may have passed as --cwd: as given,
-# physical, and its git toplevel (the plugin resolves the workspace root).
-wanted=()
-if [ "$gone" -eq 0 ]; then
-  for d in "${dirs[@]}"; do
-    case "$d" in /*) ;; *) d="$PWD/$d" ;; esac
-    wanted+=("${d%/}")
-    [ -d "$d" ] || continue
-    if p="$(CDPATH='' cd -P -- "$d" && pwd -P)"; then wanted+=("$p"); fi
-    if p="$(git -C "$d" rev-parse --show-toplevel 2>/dev/null)"; then wanted+=("$p"); fi
-  done
-fi
+left=0; seen=0
+keep() { echo "left running: $1"; left=$((left+1)); }
 
-# A failed check is not an absence: these need the system to say so.
-no_process() { case "$(export LC_ALL=C; kill -0 "$1" 2>&1)" in *"No such process"*) return 0 ;; esac; return 1; }
+# A failed check is not an absence: these need the system to say so, at the end
+# of its message, where no path the message quotes can supply the text.
+no_process() { case "$(export LC_ALL=C; kill -0 "$1" 2>&1)" in *") - No such process") return 0 ;; esac; return 1; }
+
 # 0 when the folder is gone, 1 when it exists, 2 when stat cannot tell. stat's
 # own error text ends its message, so a folder name cannot supply it.
 no_folder() {
@@ -67,6 +59,22 @@ no_folder() {
   case "$out" in *": No such file or directory") return 0 ;; esac
   return 2
 }
+
+# Every spelling of a folder the plugin may have passed as --cwd: as given,
+# physical, and its git toplevel (the plugin resolves the workspace root). A
+# folder that exists but cannot be resolved is exit 3, not a silent miss.
+wanted=()
+if [ "$gone" -eq 0 ]; then
+  for d in "${dirs[@]}"; do
+    case "$d" in /*) ;; *) d="$PWD/$d" ;; esac
+    wanted+=("${d%/}")
+    no_folder "$d"
+    case $? in 0) continue ;; 2) echo "could not resolve folder: $d"; left=$((left+1)); continue ;; esac
+    if p="$(CDPATH='' cd -P -- "$d" 2>/dev/null && pwd -P)"; then wanted+=("$p")
+    else echo "could not resolve folder: $d"; left=$((left+1)); fi
+    if p="$(git -C "$d" rev-parse --show-toplevel 2>/dev/null)"; then wanted+=("$p"); fi
+  done
+fi
 
 # 0 when the broker's folder is a target, 1 when not, 2 when that cannot be told.
 is_wanted() {
@@ -121,14 +129,11 @@ forget() {
     case $? in
       0) found=1; rm -f -- "$f" 2>/dev/null || { echo "state record not removed: $f"; left=$((left+1)); } ;;
       1) ;;
-      *) echo "state record not readable: $f"; left=$((left+1)) ;;
+      *) found=1; echo "state record not readable: $f"; left=$((left+1)) ;;
     esac
   done
   [ "$found" -eq 1 ] || echo "no state record found for the broker with pid file $1"
 }
-
-left=0; seen=0
-keep() { echo "left running: $1"; left=$((left+1)); }
 
 all="$(ps -axww -o pid=,command=)" || fail "ps failed, so brokers could not be listed"
 pids="$(printf '%s\n' "$all" | awk '/app-server-broker\.mjs serve / {print $1}')" ||
@@ -161,5 +166,5 @@ for pid in $pids; do
   fi
 done
 
-[ "$seen" -gt 0 ] || echo "no broker found"
+[ "$seen" -gt 0 ] || [ "$left" -gt 0 ] || echo "no broker found"
 [ "$left" -eq 0 ] || exit 3
