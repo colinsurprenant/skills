@@ -65,16 +65,16 @@ no-general-purpose rule.
 The multi-agent tools are `spawn_agent`, `send_message`, `followup_task`,
 `wait_agent`, `interrupt_agent` and `list_agents`. There is no close tool: a
 spawn unloads the longest-idle finished, errored or interrupted worker, even
-one with an unread `send_message`. An unloaded finished worker keeps that mail
-and reads it when a later `followup_task` starts a turn on it (verified on
-Codex 0.172.0; on 0.159.2 unread mail pinned the slot). An unloaded
-interrupted worker is gone: a `followup_task` to it fails with
-`ThreadNotFound`, so put what it still needed in a new order. Codex's default limit is 4 agents including
-this main loop, so at most 3 workers loaded, running or finished; Codex's own
-prompt states the count, and if it differs, follow it. Independent orders
-spawn in the same turn, up to that limit. On an agent-limit error (`agent
-thread limit reached`), wait for a running worker's final message, then
-retry.
+one with an unread `send_message`. A later `followup_task` reloads an
+unloaded worker, interrupted ones included, and it reads the kept mail on
+that turn (Codex 0.172.0: measured live for finished workers, read in the
+source for interrupted ones; on 0.159.2 unread mail pinned the slot). If the
+follow-up fails, give the remaining work to a new order. Codex's default
+limit is 4 agents including this main loop, so at most 3 workers loaded,
+running or finished; Codex's own prompt states the count, and if it differs,
+follow it. Independent orders spawn in the same turn, up to that limit. On an
+agent-limit error (`agent thread limit reached`), wait for a running worker's
+final message, then retry.
 
 `send_message` only queues: a worker reads it at its next model call, so one
 that has already written its final answer reads it only when a
