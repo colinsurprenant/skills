@@ -144,12 +144,13 @@ and supervision rather than model goodwill:
   roots: a repo under OpenCode's state dirs or the temp space (`/tmp`,
   `/private/tmp`, `/private/var/folders`) is writable.
 - The **GPT reviewer**, reached through Codex from a Claude Code main loop,
-  is OS-sandboxed read-only by its plugin's own default, pinned in the
-  delegate-build skill's [claude-code.md](delegate-build/claude-code.md) so a
-  plugin update that widens that default gets surfaced, not silently absorbed.
-  The lane is the plugin's `/codex:rescue` command, shipped by OpenAI rather
-  than defined here; its dedicated review commands are user-invocable only, so
-  the skill frames the rescue agent as review-only by prompt.
+  runs OS-sandboxed read-only because its request says review-only: the lane
+  is the plugin's `/codex:rescue` command, shipped by OpenAI rather than
+  defined here, whose agent otherwise adds `--write` and runs workspace-write.
+  The plugin's dedicated review commands are user-invocable only, so the skill
+  frames the rescue agent as review-only by prompt. Those defaults are pinned
+  in the delegate-build skill's [claude-code.md](delegate-build/claude-code.md)
+  so a plugin update that widens them gets surfaced, not silently absorbed.
 - The **Claude reviewer** gets the same treatment by
   [delegate-build/sandbox/claude-review.sh](delegate-build/sandbox/claude-review.sh),
   which is the standard Phase 4 Claude path. Sandboxing a reviewer while build
