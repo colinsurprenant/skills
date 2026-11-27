@@ -86,9 +86,13 @@ it (`wait_agent` is the status call), never hand a researcher your hypothesis
 it sits unread until a `followup_task`. A finished worker gets
 `followup_task`.
 
-`wait_agent` returns on the FIRST finisher and also on timeout: a timeout is
-not a report, so keep waiting until every spawned worker has delivered its
-final message. A worker that ends without one is a Phase 3 finding.
+`wait_agent` returns on the first mailbox update from any worker, a message
+sent mid-run as well as a final status; when the user steers new input into
+the turn; or on timeout. It names which workers have updates, not what they
+said (Codex 0.172.0's tool description). A wake is a notice, not the report:
+answer a worker's question, take the user's input first, and treat a timeout
+as nothing. Keep waiting until every spawned worker has delivered its final
+message. A worker that ends without one is a Phase 3 finding.
 
 SKILL.md Phase 5's "one narrow correction to the same builder" goes through
 `followup_task` to that worker's `task_name`. A follow-up to a finished worker
