@@ -1,0 +1,200 @@
+#!/usr/bin/env bash
+# Stop the Codex plugin's leftover app-server brokers for the folders named, or
+# for folders that no longer exist.
+#
+# Usage: bin/codex-broker-stop [--dry-run] <dir>...
+#        bin/codex-broker-stop [--dry-run] --gone
+#   <dir>...  stop the brokers started for these folders (a worktree a GPT lane
+#             ran in). --gone stops the brokers whose folder was deleted.
+#   Exit 0 when nothing is left to stop, 2 on a usage error, 3 when a broker or
+#   its state record was left, or processes or a named folder could not be
+#   inspected; the output says why.
+#
+# Why this exists: the codex plugin (1.0.6) starts one detached broker per
+# workspace (a git worktree, or the folder itself outside git), and its
+# SessionEnd hook stops only the broker of the workspace the session ended in
+# (session-lifecycle-hook.mjs). A lane run in a worktree leaves
+# its broker, app server and code-mode host up for good; on 2026-11-24 that was
+# 79 brokers, about 4 GB of summed RSS. The next Codex run in a folder whose
+# broker was stopped starts a new one (broker-lifecycle.mjs, ensureBrokerSession).
+#
+# A broker with no client holds exactly 4 unix sockets: 3 to its app server and
+# the listener. A connected client is a fifth (checked on macOS by opening one).
+# Any other count is left alone. Limits: a client can still connect between the
+# count and the signal; a turn whose client died may still be running with no one
+# to deliver its result to, and stopping the broker ends it; a lane started in
+# the folder at the very moment its old record is removed can lose its new one.
+#
+# Only macOS is supported: the socket count and the ps fields were measured there.
+set -uo pipefail
+
+usage() { echo "usage: bin/codex-broker-stop [--dry-run] (<dir>... | --gone)" >&2; exit 2; }
+fail() { echo "codex-broker-stop: $1" >&2; exit 3; }
+
+dry=0; gone=0; dirs=()
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --dry-run) dry=1; shift ;;
+    --gone)    gone=1; shift ;;
+    -*)        usage ;;
+    '')        usage ;;
+    *)         dirs+=("$1"); shift ;;
+  esac
+done
+if [ "$gone" -eq 1 ]; then [ "${#dirs[@]}" -eq 0 ] || usage; else [ "${#dirs[@]}" -gt 0 ] || usage; fi
+[ "$(uname -s)" = Darwin ] || fail "only macOS is supported"
+# git must find each folder's own repository, not one the caller's environment
+# points at (a git hook exports these).
+unset GIT_DIR GIT_WORK_TREE GIT_COMMON_DIR
+command -v lsof >/dev/null || fail "lsof not found"
+
+left=0; seen=0
+keep() { echo "left running: $1"; left=$((left+1)); }
+
+# A failed check is not an absence: these need the system to say so, at the end
+# of its message, where no path the message quotes can supply the text.
+no_process() { case "$(export LC_ALL=C; kill -0 "$1" 2>&1)" in *") - No such process") return 0 ;; esac; return 1; }
+
+# 0 when the folder is gone, 1 when it exists, 2 when stat cannot tell. stat's
+# own error text ends its message, so a folder name cannot supply it.
+no_folder() {
+  local out
+  if out="$(LC_ALL=C stat "$1" 2>&1)"; then return 1; fi
+  case "$out" in *": No such file or directory") return 0 ;; esac
+  return 2
+}
+
+# The as-given spelling without empty or "." components. ".." stays as given:
+# undoing it by text names another folder when a symlink comes before it.
+tidy() {
+  local rest="${1#/}" part out=""
+  while [ -n "$rest" ]; do
+    part="${rest%%/*}"
+    case "$rest" in */*) rest="${rest#*/}" ;; *) rest="" ;; esac
+    case "$part" in ''|.) ;; *) out="$out/$part" ;; esac
+  done
+  printf '%s\n' "${out:-/}"
+}
+
+# Every spelling of a named folder: as given (tidied), physical, and its git
+# toplevel. A folder that exists but cannot be resolved is exit 3, not a silent
+# miss.
+wanted=()
+if [ "$gone" -eq 0 ]; then
+  for d in "${dirs[@]}"; do
+    case "$d" in /*) ;; *) d="$PWD/$d" ;; esac
+    wanted+=("$(tidy "$d")")
+    no_folder "$d"
+    case $? in 0) continue ;; 2) echo "could not resolve folder: $d"; left=$((left+1)); continue ;; esac
+    if p="$(CDPATH='' cd -P -- "$d" 2>/dev/null && pwd -P)"; then wanted+=("$p")
+    else echo "could not resolve folder: $d"; left=$((left+1)); fi
+    if p="$(git -C "$d" rev-parse --show-toplevel 2>/dev/null)"; then wanted+=("$p"); fi
+  done
+fi
+
+# 0 when the broker's folder is a target, 1 when not, 2 when that cannot be told.
+# The plugin keeps one broker per git workspace but starts it with the folder
+# of its first run there, which can be a subfolder (state.mjs, workspace.mjs,
+# broker-lifecycle.mjs), so a broker also matches through its folder's toplevel.
+is_wanted() {
+  local w top
+  if [ "$gone" -eq 1 ]; then no_folder "$1"; return; fi
+  for w in "${wanted[@]}"; do [ "$w" = "$1" ] && return 0; done
+  if top="$(git -C "$1" rev-parse --show-toplevel 2>/dev/null)"; then
+    for w in "${wanted[@]}"; do [ "$w" = "$top" ] && return 0; done
+    return 1
+  fi
+  # git could not answer for the broker's folder. Under a named git workspace it
+  # may be a subfolder of it that was removed or closed off: that is unknown.
+  for w in "${wanted[@]}"; do
+    case "$1" in
+      "$w"/*) [ "$(git -C "$w" rev-parse --show-toplevel 2>/dev/null)" = "$w" ] && return 2 ;;
+    esac
+  done
+  return 1
+}
+
+# Sets cwd and pidfile when the process is, right now, a broker of the plugin.
+# Returns 1 when it is not one, 2 when ps could not read it. The executable path
+# is stripped using comm, which keeps its spaces, so a shell or a `node -e` whose
+# text merely quotes a broker command is not one. The plugin generates the
+# endpoint and pid-file values, so the first --cwd and the last --pid-file are the
+# real ones whatever the folder is called.
+broker_of() {
+  local comm cmd rest
+  if ! comm="$(ps -ww -o comm= -p "$1" 2>/dev/null)" ||
+     ! cmd="$(ps -ww -o command= -p "$1" 2>/dev/null)"; then
+    if no_process "$1"; then return 1; fi
+    return 2
+  fi
+  [ "${comm##*/}" = node ] || return 1
+  rest="${cmd#"$comm" }"
+  case "$rest" in
+    "$HOME"/.claude/plugins/cache/*/codex/*/scripts/app-server-broker.mjs\ serve\ --endpoint\ *\ --cwd\ *\ --pid-file\ *) ;;
+    *) return 1 ;;
+  esac
+  pidfile="${rest##* --pid-file }"
+  cwd="${rest#* --cwd }"; cwd="${cwd% --pid-file *}"
+}
+
+# Prints the process's unix socket count; fails when lsof cannot read it.
+sockets() {
+  local out
+  out="$(lsof -nP -a -U -p "$1" 2>/dev/null)" || return 1
+  printf '%s\n' "$out" | awk 'NR>1 {n++} END {print n+0}'
+}
+
+# The plugin's record of a broker (broker.json) holds its pid, and a later
+# SessionEnd in that folder signals that pid's process group without checking
+# what it is (session-lifecycle-hook.mjs, process.mjs). Once the broker is gone
+# the pid can be reused, so its record goes too, matched by its pid file, which
+# is unique to one broker.
+forget() {
+  local f found=0
+  for f in "${CLAUDE_PLUGIN_DATA:-/nonexistent}"/state/*/broker.json \
+           "$HOME"/.claude/plugins/data/codex-*/state/*/broker.json \
+           "${TMPDIR:-/tmp}"/codex-companion/*/broker.json; do
+    [ -f "$f" ] || continue
+    grep -Fq "\"pidFile\": \"$1\"" "$f" 2>/dev/null
+    case $? in
+      0) found=1; rm -f -- "$f" 2>/dev/null || { echo "state record not removed: $f"; left=$((left+1)); } ;;
+      1) ;;
+      *) found=1; echo "state record not readable: $f"; left=$((left+1)) ;;
+    esac
+  done
+  [ "$found" -eq 1 ] || echo "no state record found for the broker with pid file $1"
+}
+
+all="$(ps -axww -o pid=,command=)" || fail "ps failed, so brokers could not be listed"
+pids="$(printf '%s\n' "$all" | awk '/app-server-broker\.mjs serve / {print $1}')" ||
+  fail "awk failed, so brokers could not be listed"
+for pid in $pids; do
+  broker_of "$pid"
+  case $? in 0) ;; 2) keep "$pid (ps could not read it)"; continue ;; *) continue ;; esac
+  is_wanted "$cwd"
+  case $? in 0) ;; 2) keep "$pid (could not inspect its folder) $cwd"; continue ;; *) continue ;; esac
+  seen=$((seen+1)); first="$pidfile"
+  if ! n="$(sockets "$pid")"; then keep "$pid (lsof could not read it) $cwd"; continue; fi
+  if [ "$n" -gt 4 ]; then keep "$pid (a client is connected: $n unix sockets, not 4) $cwd"; continue; fi
+  if [ "$n" -lt 4 ]; then keep "$pid (starting or stopping: $n unix sockets, not 4) $cwd"; continue; fi
+  if [ "$dry" -eq 1 ]; then echo "would stop: $pid $cwd"; continue; fi
+  # The pid may have been reused since the count; the pid file names one broker.
+  if ! broker_of "$pid" || [ "$pidfile" != "$first" ]; then
+    if no_process "$pid"; then forget "$first"; else keep "$pid (changed while being checked)"; fi
+    continue
+  fi
+  if ! kill -TERM "$pid" 2>/dev/null && ! no_process "$pid"; then
+    keep "$pid (could not signal) $cwd"; continue
+  fi
+  i=0
+  while ! no_process "$pid" && [ "$i" -lt 50 ]; do sleep 0.1; i=$((i+1)); done
+  if no_process "$pid"; then
+    echo "stopped: $pid $cwd"
+    forget "$pidfile"
+  else
+    keep "$pid (still up 5 s after the stop request) $cwd"
+  fi
+done
+
+[ "$seen" -gt 0 ] || [ "$left" -gt 0 ] || echo "no broker found"
+[ "$left" -eq 0 ] || exit 3

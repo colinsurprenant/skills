@@ -91,6 +91,14 @@ is the `claude-reviewer` agent.
   CLI or any other state-writing command; deliver your complete findings as
   your final message." After a plugin update, re-check the sandbox defaults; a
   change is a roster-level change to surface to the user.
+  After the lane's result is in, when it ran in a worktree, stop the broker it
+  left there: `"$(cd -P ~/.claude/skills/delegate-build/.. && pwd)/bin/codex-broker-stop" "<worktree>"`.
+  The plugin (v1.0.6) stops only the broker of the folder the session ends in,
+  so a worktree's broker otherwise stays up for good. Exit 3 means something was
+  left or could not be inspected, and the output says what: "a client is
+  connected" means some Codex run is using that broker, so leave it; report
+  anything else.
+  Run it before removing a worktree too; `--gone` cleans up after removed ones.
 - **Kimi (via OpenCode)**: via Bash with `run_in_background` (or a long
   explicit timeout),
   `~/.claude/skills/delegate-build/sandbox/kimi-review.sh "<review prompt naming
