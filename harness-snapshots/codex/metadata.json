@@ -1,97 +1,100 @@
 {
   "active_source": "config",
   "arch": "aarch64-apple-darwin",
-  "binary_sha256": "12ac11d2c7eee27cfae34393986d7b7c9ed0dea537cb749831cdd7033893e6de",
+  "binary_sha256": "f30a99714dc984876864239ef60563949b1e21421a7c9180422f51fd39186bc6",
   "configured_model": "gpt-6-astra",
   "prompts": [
     {
       "active": false,
-      "bytes": 21779,
+      "bytes": 25959,
       "file": "prompt-1.txt",
+      "models": [
+        "gpt-6.2-astra",
+        "gpt-6.2-sol"
+      ],
+      "sha256": "aa47d2dee261594c4944241b646088730d74d87afa4da8d2da0554540a5e7623"
+    },
+    {
+      "active": false,
+      "bytes": 22166,
+      "file": "prompt-2.txt",
+      "models": [],
+      "sha256": "c07aabe5a06a2a6c4c91fd61a940e6c94285fdedfe7fd51d71c5fe8af40bf28b"
+    },
+    {
+      "active": false,
+      "bytes": 21534,
+      "file": "prompt-3.txt",
       "models": [
         "gpt-6.1-sol"
       ],
-      "sha256": "e1bdd4f8f0df4b20f4a0ffc8a861ce819df45325d8cecdfb92e80379cf8d142e"
+      "sha256": "d12e6dbdfd4a4ddb26a1f6048b69a32b8b32f74e4add9791d1dff7f4cac0b032"
     },
     {
       "active": false,
       "bytes": 21473,
-      "file": "prompt-2.txt",
+      "file": "prompt-4.txt",
       "models": [
         "gpt-5.5"
       ],
       "sha256": "2351631dfc5644dc5a45eaaca4139475bd02810ee6cb792d058b551559b3242e"
     },
     {
-      "active": true,
-      "bytes": 21428,
-      "file": "prompt-3.txt",
-      "models": [
-        "gpt-6-astra"
-      ],
-      "sha256": "35bd51b5f577cb7b24cd5f4629e49e37cb724ab57754ce6f8f202001635bab8a"
-    },
-    {
       "active": false,
-      "bytes": 21158,
-      "file": "prompt-4.txt",
-      "models": [],
-      "sha256": "4745c88f3e25bb42ee8fb94a744f3c4bbb4e51029006b6ea2e47fc7f8068e00b"
-    },
-    {
-      "active": false,
-      "bytes": 21016,
+      "bytes": 21244,
       "file": "prompt-5.txt",
       "models": [],
-      "sha256": "538ab92c352ac4f2df1e786b4100f4fae7231be85810776c9a05048d670e1c97"
+      "sha256": "c695cf5ba4280f2d4b7ff1c8ea9739bd6e44d60a0dd653b3c0f66237628c403e"
+    },
+    {
+      "active": true,
+      "bytes": 21183,
+      "file": "prompt-6.txt",
+      "models": [
+        "gpt-6-astra",
+        "gpt-6.1-terra"
+      ],
+      "sha256": "4ddce5803b638f01342f657002289d1307634c677df840eeefdd4bc5b451276d"
     },
     {
       "active": false,
-      "bytes": 18998,
-      "file": "prompt-6.txt",
+      "bytes": 18754,
+      "file": "prompt-7.txt",
       "models": [
         "gpt-6-sol"
       ],
-      "sha256": "b1dd8718c037906c53a305c5cbccb4a4be35ccbb7837461ec349bfc495412f0d"
+      "sha256": "a8567d97e0fb03f19942650430e0905fd2e092f102e8d98c03fc1b89995619c2"
     },
     {
       "active": false,
-      "bytes": 18043,
-      "file": "prompt-7.txt",
+      "bytes": 17799,
+      "file": "prompt-8.txt",
       "models": [
         "gpt-6-luna"
       ],
-      "sha256": "b707476816bfe5e571a1bd2179f130fff2b132da5ab8e61063acdb7fd24daf12"
+      "sha256": "e52174f354e3970ad8de5935fff8d04ddf2890a35659283d163befb56490198c"
     },
     {
       "active": false,
       "bytes": 17766,
-      "file": "prompt-8.txt",
+      "file": "prompt-9.txt",
       "models": [
         "codex-auto-review",
         "gpt-5.6-luna",
         "gpt-5.6-sol",
-        "gpt-5.6-terra"
+        "gpt-5.6-terra",
+        "gpt-daybreak-blue-latest"
       ],
       "sha256": "a91357a1cd2727a0be06d461248d6e3a7274746e38108f548a3adf2cc2430415"
     },
     {
       "active": false,
-      "bytes": 17312,
-      "file": "prompt-9.txt",
-      "models": [
-        "gpt-daybreak-blue-latest"
-      ],
-      "sha256": "ebd0d5854abd07dc38300a71e027204eb028e9fa443c59d18e36fcc24289e818"
-    },
-    {
-      "active": false,
-      "bytes": 17311,
+      "bytes": 17765,
       "file": "prompt-10.txt",
       "models": [
         "gpt-daybreak-red-latest"
       ],
-      "sha256": "40a1232c8bd01a87dc2283e5ae3c75f2b054dc2a12cf04e5a279c26e5c541b9b"
+      "sha256": "0972574f9d43b6c30321624b9ba5eec3a47db32251b7ba6d94807bf5295170e3"
     },
     {
       "active": false,
@@ -104,5 +107,5 @@
       "sha256": "f47fbb2bdba5e7528bfae7f5e2844a7d45a3a922fa74b718f22b22917376cfcf"
     }
   ],
-  "version": "0.161.0"
+  "version": "0.172.0"
 }

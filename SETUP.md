@@ -186,7 +186,7 @@ verify a directory without writing. A symlink at a target path, or a file the
 renderer did not generate, is an error in a write and in `--check`, and is
 skipped silently under `--refresh`, which only touches files it generated
 (that is what plain `bin/install` runs). The agent file format was verified
-against Codex CLI 0.159.2.
+against Codex CLI 0.172.0.
 
 Start the main loop with `codex --sandbox workspace-write --ask-for-approval
 on-request` and invoke the skill as `$delegate-build`. The main loop must be
@@ -228,7 +228,7 @@ wrapper), except Kimi's provider, which is part of its `roster.conf` slug.
 
 | Lane | Needs | Notes |
 | --- | --- | --- |
-| GPT (via Codex) | the `openai/codex-plugin-cc` Claude Code plugin, plus the `codex` CLI on PATH, logged in | read-only by the plugin's own default. The lane dispatches the plugin's own `/codex:rescue` command, not one defined here: the plugin's dedicated `/codex:review` commands are user-invocable only, so delegate-build frames the fix-capable rescue agent as review-only by prompt |
+| GPT (via Codex) | the `openai/codex-plugin-cc` Claude Code plugin, plus the `codex` CLI on PATH, logged in | read-only only because the request says review-only. The lane dispatches the plugin's own `/codex:rescue` command, not one defined here: the plugin's dedicated `/codex:review` commands are user-invocable only, so delegate-build frames the fix-capable rescue agent as review-only by prompt; without that framing the rescue agent adds `--write` and runs workspace-write |
 | Kimi (via OpenCode) | `opencode` 2.x, a Kimi provider, and `srt` | model and optional reasoning variant pinned from `roster.conf` at the repo root; change the slug there if your provider spells it differently, and add that provider's API host to `network.allowedDomains` in `delegate-build/sandbox/kimi-srt-settings.json`, or the sandbox blocks it. OpenCode 2's local server needs loopback, so the sandbox lets the reviewer listen on any interface and connect out to localhost, which reaches every service listening there. The sandbox keeps the reviewer off your files and the open internet; it is not a boundary against a deliberate escape through a local service. It does block the OpenCode service password and the Claude Code IDE tokens, the two known routes to an unsandboxed agent |
 | Claude (sandboxed, opt-in) | `claude` on PATH and `srt` | model and effort pinned from `roster.conf` at the repo root |
 
