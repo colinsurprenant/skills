@@ -74,9 +74,10 @@ claim rests on, verbatim:
     For actions that are hard to reverse or outward-facing, confirm first
 
 If any is **missing**, treat the entire Claude Code prompt as changed and
-audit it in full, and the routing line's claim is stale. (The marker used to
-be the comment-idiom sentence; the Opus 5.5 prompt dropped it by 2026-11-27,
-and the comment rule moved to SHARED.)
+audit it in full, and check whether the routing line's claim still holds: the
+prompt may have reworded the sentence rather than dropped it. (The marker
+used to be the comment-idiom sentence; the Opus 5.5 prompt dropped it by
+2026-11-27, and the comment rule moved to SHARED.)
 
 Otherwise, snapshot and diff — Claude Code drift still becomes a diff, just
 not a git one: `harness-snapshots/claude-code/` is gitignored and local-only
