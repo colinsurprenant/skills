@@ -64,12 +64,19 @@ No script can retrieve the Claude Code system prompt. It doesn't need to: you ar
 running inside Claude Code and its system prompt is in your context. Read it
 there.
 
-Sanity marker — the live prompt should contain, verbatim:
+Sanity markers: AGENT_BEHAVIOR.md's Claude Code routing line says the harness
+already covers faithful reporting, parallel tool calls and confirmation
+before irreversible actions. The live prompt should contain each sentence that
+claim rests on, verbatim:
 
-    Write code that reads like the surrounding code: match its comment density, naming, and idiom.
+    Report outcomes faithfully: if tests fail, say so with the output
+    Independent tool calls can run in parallel in one response.
+    For actions that are hard to reverse or outward-facing, confirm first
 
-If that string is **missing**, treat the entire Claude Code prompt as changed
-and audit it in full.
+If any is **missing**, treat the entire Claude Code prompt as changed and
+audit it in full, and the routing line's claim is stale. (The marker used to
+be the comment-idiom sentence; the Opus 5.5 prompt dropped it by 2026-11-27,
+and the comment rule moved to SHARED.)
 
 Otherwise, snapshot and diff — Claude Code drift still becomes a diff, just
 not a git one: `harness-snapshots/claude-code/` is gitignored and local-only
@@ -78,23 +85,31 @@ machine-specific paths), so the baseline is the previous local snapshot, not
 a committed one:
 
 - `harness-snapshots/claude-code/system-prompt.txt` — the live system prompt's
-  harness prose, verbatim. EXCLUDE: tool/function schemas and the tool-system
-  preamble, system-reminder rosters (skills, agent types, MCP instructions),
+  harness prose, verbatim. EXCLUDE: tool/function schemas (except the Agent
+  tool's description, next file) and the tool-system preamble,
+  system-reminder rosters (skills, agent types, MCP instructions),
   the gitStatus session block, and the appended AGENT_BEHAVIOR.md sections
   (`### IDENTITY` / `### CRITICAL BEHAVIOR`) — including those would make the
   audit compare the file against itself. If a sentence contains harness tool
   markup you cannot emit literally, normalize it (e.g. backtick the tag name)
   and record that.
+- `harness-snapshots/claude-code/agent-tool.txt` — the Agent tool's
+  `description` text, verbatim, without its parameter schema. It is the one
+  tool description kept: Claude Code's delegation guidance lives there, and
+  it bears on MAIN LOOP: DELEGATION (on 2026-11-27 its "When in doubt, don't
+  spawn" conflicted with that section's lean toward delegating, a conflict the
+  prose snapshot could not show).
 - `harness-snapshots/claude-code/metadata.json` — `{"excludes": [...],
   "model": "<exact model id from the environment>", "normalizations": [...]}`.
   No timestamps.
 
-Before overwriting, write the live prompt's prose to a temp file and `diff`
-it against the existing local snapshot; that diff scopes this audit the same
-way Step 2 scopes the others — but only if the snapshot's metadata.json names
-the same model: the prompt varies with model and session settings, so a
-cross-model diff is noise, not drift. No local snapshot yet, or a different
-model? This run is the baseline — audit the full prompt.
+Before overwriting, write the live prompt's prose and the Agent tool's
+description to temp files and `diff` each against its local snapshot; that
+diff scopes this audit the same way Step 2 scopes the others — but only if
+the snapshot's metadata.json names the same model: the prompt varies with
+model and session settings, so a cross-model diff is noise, not drift. No
+local snapshot yet, or a different model? This run is the baseline — audit
+the full prompt.
 
 ## Step 4 — Classify
 
