@@ -77,18 +77,27 @@ running worker's final message, then retry.
 
 `send_message` only queues: a worker reads it at its next model call, so one
 that has already written its final answer reads it only when a
-`followup_task` starts a turn on it. Orders are self-contained,
-so use it only to relay a user decision that changes a running order, to
-answer a worker's own question, or to correct a running order that new
-evidence has invalidated (say what changed, add no scope). Never poll with
-it (`wait_agent` is the status call), never hand a researcher your hypothesis
-(a validator judges independently), and never message a finished worker:
-it sits unread until a `followup_task`. A finished worker gets
-`followup_task`.
+`followup_task` starts a turn on it. Orders are self-contained, so use it
+only to relay a user decision that changes a running order, to answer a
+worker's own question, or to correct a running order that new evidence has
+invalidated (say what changed, add no scope). Never poll with it
+(`wait_agent` is the waiting call, `list_agents` reports each worker's
+status), never hand a researcher your hypothesis (a validator judges
+independently), and never message a finished worker: it sits unread until a
+`followup_task`. A finished worker gets `followup_task`.
 
-`wait_agent` returns on the FIRST finisher and also on timeout: a timeout is
-not a report, so keep waiting until every spawned worker has delivered its
-final message. A worker that ends without one is a Phase 3 finding.
+`wait_agent` returns on the first mailbox update from any worker, a message
+sent mid-run as well as a final answer; on new input steered into the turn,
+usually the user's; or on timeout. Its result is a `message` that starts with
+"Wait completed.", "Wait interrupted by new input." or "Wait timed out." (a
+too-short timeout adds a note that it was raised) and a `timed_out` flag,
+whatever its tool description promises: the worker's own message reaches you
+separately, a final answer as a `FINAL_ANSWER` message carrying its task
+name, sender and payload (Codex 0.172.0 source). A wake is a notice, not the
+report: read what arrived, answer a worker's question, take the user's input
+first, and treat a timeout as nothing. Keep waiting until every spawned
+worker has delivered its final message. A worker that ends without one is a
+Phase 3 finding.
 
 SKILL.md Phase 5's "one narrow correction to the same builder" goes through
 `followup_task` to that worker's `task_name`. A follow-up to a finished worker
