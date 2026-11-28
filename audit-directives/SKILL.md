@@ -79,11 +79,11 @@ prompt may have reworded the sentence rather than dropped it. (The marker
 used to be the comment-idiom sentence; the Opus 5.5 prompt dropped it by
 2026-11-27, and the comment rule moved to SHARED.)
 
-Otherwise, snapshot and diff — Claude Code drift still becomes a diff, just
-not a git one: `harness-snapshots/claude-code/` is gitignored and local-only
-(Anthropic doesn't publish this prompt, and the snapshot embeds
-machine-specific paths), so the baseline is the previous local snapshot, not
-a committed one:
+Either way, snapshot and diff — a full audit still refreshes the baseline.
+Claude Code drift still becomes a diff, just not a git one:
+`harness-snapshots/claude-code/` is gitignored and local-only (Anthropic
+doesn't publish this prompt, and the snapshot embeds machine-specific paths),
+so the baseline is the previous local snapshot, not a committed one:
 
 - `harness-snapshots/claude-code/system-prompt.txt` — the live system prompt's
   harness prose, verbatim. EXCLUDE: tool/function schemas (except the Agent
@@ -107,10 +107,10 @@ a committed one:
 Before overwriting, write the live prompt's prose and the Agent tool's
 description to temp files and `diff` each against its local snapshot; that
 diff scopes this audit the same way Step 2 scopes the others — but only if
-the snapshot's metadata.json names the same model: the prompt varies with
-model and session settings, so a cross-model diff is noise, not drift. No
-local snapshot yet, or a different model? This run is the baseline — audit
-the full prompt.
+every sanity sentence was found and the snapshot's metadata.json names the
+same model: the prompt varies with model and session settings, so a
+cross-model diff is noise, not drift. No local snapshot yet, or a different
+model? This run is the baseline — audit the full prompt.
 
 ## Step 4 — Classify
 
