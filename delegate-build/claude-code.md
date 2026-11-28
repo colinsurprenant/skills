@@ -90,10 +90,17 @@ is the `claude-reviewer` agent.
   sandbox, so a `~/.codex/rules` allowlist entry punches through (seen with
   `director emit`). Director is a separate coordination CLI; without it the
   kill costs nothing. The kill is prompt-enforced because the plugin owns the
-  spawn: tell the rescue agent to prefix the runtime invocation with `DIRECTOR_BIN=/dev/null` (every
-  hook shim honors it), and include in the request: "Never run the `director`
-  CLI or any other state-writing command; deliver your complete findings as
-  your final message." After a plugin update, re-check the sandbox defaults; a
+  spawn: tell the rescue agent to prefix the runtime invocation with
+  `DIRECTOR_DISABLE=1 DIRECTOR_BIN=/dev/null`, the same two-layer Director
+  kill as the Kimi and Claude wrappers (`DIRECTOR_DISABLE` makes every
+  `director _hook` a no-op, and every hook shim honors `DIRECTOR_BIN`), and
+  include in the request: "Never run the `director` CLI or any other
+  state-writing command; deliver your complete findings as your final
+  message." The prefix reaches Codex's hooks only when that call starts the
+  plugin's broker, which keeps the environment it started with
+  (`broker-lifecycle.mjs`, plugin v1.0.6); stopping the broker after each
+  worktree lane (below) makes a fresh one the usual case. After a plugin
+  update, re-check the sandbox defaults; a
   change is a roster-level change to surface to the user.
   After the lane's result is in, when it ran in a worktree, stop the broker it
   left there: `"$(cd -P ~/.claude/skills/delegate-build/.. && pwd)/bin/codex-broker-stop" "<worktree>"`.
