@@ -96,12 +96,13 @@ is the `claude-reviewer` agent.
   `director _hook` a no-op, and every hook shim honors `DIRECTOR_BIN`), and
   include in the request: "Never run the `director` CLI or any other
   state-writing command; deliver your complete findings as your final
-  message." The prefix reaches Codex's hooks only when that call starts the
-  plugin's broker, which keeps the environment it started with
-  (`broker-lifecycle.mjs`, plugin v1.0.6); stopping the broker after each
-  worktree lane (below) makes a fresh one the usual case. After a plugin
-  update, re-check the sandbox defaults; a
-  change is a roster-level change to surface to the user.
+  message." A broker already running keeps the environment it started with,
+  so the prefix reaches Codex's hooks when that call starts a new broker or
+  the plugin's direct app-server fallback (taken when a broker is busy), not
+  when it reuses one (`broker-lifecycle.mjs`, `codex.mjs`, plugin v1.0.6);
+  stopping the broker after each worktree lane (below) makes reuse rare.
+  After a plugin update, re-check the sandbox defaults; a change is a
+  roster-level change to surface to the user.
   After the lane's result is in, when it ran in a worktree, stop the broker it
   left there: `"$(cd -P ~/.claude/skills/delegate-build/.. && pwd)/bin/codex-broker-stop" "<worktree>"`.
   The plugin (v1.0.6) stops only the broker of the folder the session ends in,
