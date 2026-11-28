@@ -66,8 +66,11 @@ there.
 
 Sanity markers: AGENT_BEHAVIOR.md's Claude Code routing line says the harness
 already covers faithful reporting, parallel tool calls and confirmation
-before irreversible actions. The live prompt should contain each sentence that
-claim rests on, verbatim:
+before irreversible actions. The live prompt's harness prose, after the
+snapshot's exclusions below, should contain each sentence that claim rests
+on, verbatim. Check it with those exclusions applied: AGENT_BEHAVIOR.md
+itself quotes the reporting sentence, so an unfiltered prompt can pass after
+the harness dropped it.
 
     Report outcomes faithfully: if tests fail, say so with the output
     Independent tool calls can run in parallel in one response.
