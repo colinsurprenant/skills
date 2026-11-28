@@ -36,8 +36,8 @@ that decides where work runs, and a little cockpit trim.
 ### Behavior: one contract, every harness
 
 The same behavior file reaches Claude Code, Codex CLI, OpenCode, and
-Copilot CLI, and a directive only stays if the harness running it doesn't
-already enforce it.
+Copilot CLI, and a directive only stays while a harness it reaches doesn't
+already enforce it: a shared one goes only once every harness does.
 Keeping that true takes machinery: harness system prompts change under you,
 so Claude Code's, Codex's and OpenCode's are snapshotted, diffed, and the file
 is audited against them (Copilot CLI's is not).
