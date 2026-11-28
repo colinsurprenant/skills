@@ -90,11 +90,19 @@ is the `claude-reviewer` agent.
   sandbox, so a `~/.codex/rules` allowlist entry punches through (seen with
   `director emit`). Director is a separate coordination CLI; without it the
   kill costs nothing. The kill is prompt-enforced because the plugin owns the
-  spawn: tell the rescue agent to prefix the runtime invocation with `DIRECTOR_BIN=/dev/null` (every
-  hook shim honors it), and include in the request: "Never run the `director`
-  CLI or any other state-writing command; deliver your complete findings as
-  your final message." After a plugin update, re-check the sandbox defaults; a
-  change is a roster-level change to surface to the user.
+  spawn: tell the rescue agent to prefix the runtime invocation with
+  `DIRECTOR_DISABLE=1 DIRECTOR_BIN=/dev/null`, the same two-layer Director
+  kill as the Kimi and Claude wrappers (`DIRECTOR_DISABLE` makes every
+  `director _hook` a no-op, and every hook shim honors `DIRECTOR_BIN`), and
+  include in the request: "Never run the `director` CLI or any other
+  state-writing command; deliver your complete findings as your final
+  message." A broker already running keeps the environment it started with,
+  so the prefix reaches Codex's hooks when that call starts a new broker or
+  the plugin's direct app-server fallback (taken when a broker is busy), not
+  when it reuses one (`broker-lifecycle.mjs`, `codex.mjs`, plugin v1.0.6);
+  stopping the broker after each worktree lane (below) makes reuse rare.
+  After a plugin update, re-check the sandbox defaults; a change is a
+  roster-level change to surface to the user.
   After the lane's result is in, when it ran in a worktree, stop the broker it
   left there: `"$(cd -P ~/.claude/skills/delegate-build/.. && pwd)/bin/codex-broker-stop" "<worktree>"`.
   The plugin (v1.0.6) stops only the broker of the folder the session ends in,
